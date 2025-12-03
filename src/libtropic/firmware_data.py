@@ -26,7 +26,7 @@ Usage:
 
 Note:
     These firmware files are for ACAB silicon (bootloader v2.0.1) only.
-    Using them with ABAB silicon (bootloader v1.0.1) will not work.
+    This library does not support firmware updates for older ABAB silicon.
 """
 
 from importlib.resources import files, as_file

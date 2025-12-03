@@ -81,13 +81,9 @@ L2_SLEEP_REQ_ID = 0x20
 L2_GET_LOG_REQ_ID = 0xA2
 L2_STARTUP_REQ_ID = 0xB3
 
-# Firmware update L2 request IDs (maintenance mode only)
-# ACAB silicon
-L2_MUTABLE_FW_UPDATE_REQ_ID_ACAB = 0xB0       # Start authenticated FW update
+# Firmware update L2 request IDs (maintenance mode only, ACAB silicon)
+L2_MUTABLE_FW_UPDATE_REQ_ID = 0xB0            # Start authenticated FW update
 L2_MUTABLE_FW_UPDATE_DATA_REQ_ID = 0xB1       # Send FW data chunks
-# ABAB silicon
-L2_MUTABLE_FW_UPDATE_REQ_ID_ABAB = 0xB1       # Update FW in chunks
-L2_MUTABLE_FW_ERASE_REQ_ID = 0xB2             # Erase FW bank
 
 
 # =============================================================================
@@ -314,17 +310,11 @@ L3_ECC_PRIVKEY_SIZE = 32
 
 
 # =============================================================================
-# Firmware Update Constants (L2 level, maintenance mode only)
+# Firmware Update Constants (L2 level, maintenance mode only, ACAB silicon)
 # =============================================================================
 
-# ABAB silicon firmware update
-L2_MUTABLE_FW_UPDATE_CHUNK_SIZE = 128        # Firmware sent in 128-byte chunks
-L2_MUTABLE_FW_UPDATE_REQ_LEN_MIN_ABAB = 3    # bank_id(1) + offset(2) minimum
-L2_MUTABLE_FW_UPDATE_DATA_MAX_ABAB = 248     # Max data per chunk
+# ACAB authenticated firmware update header size
+L2_MUTABLE_FW_UPDATE_HEADER_SIZE = 0x68      # 104 bytes: signature(64) + hash(32) + header(8)
 
-# ACAB silicon firmware update
-L2_MUTABLE_FW_UPDATE_REQ_LEN_ACAB = 0x68     # 104 bytes: signature(64) + hash(32) + header(8)
-
-# Maximum firmware sizes
-MUTABLE_FW_UPDATE_SIZE_MAX_ABAB = 25600
-MUTABLE_FW_UPDATE_SIZE_MAX_ACAB = 30720
+# Maximum firmware size for ACAB silicon
+MUTABLE_FW_UPDATE_SIZE_MAX = 30720

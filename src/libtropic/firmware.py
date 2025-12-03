@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from .enums import DeviceMode, ReturnCode
 from .exceptions import TropicError, ParamError
-from .types import MUTABLE_FW_UPDATE_SIZE_MAX_ACAB
+from .types import MUTABLE_FW_UPDATE_SIZE_MAX
 
 if TYPE_CHECKING:
     from .device import Tropic01
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 ACAB_FW_HEADER_SIZE = 105
 
 # Maximum firmware size for ACAB silicon
-MAX_FW_SIZE = MUTABLE_FW_UPDATE_SIZE_MAX_ACAB  # 30720 bytes
+MAX_FW_SIZE = MUTABLE_FW_UPDATE_SIZE_MAX  # 30720 bytes
 
 
 class FirmwareUpdater:
@@ -101,7 +101,7 @@ class FirmwareUpdater:
         Maps to: lt_do_mutable_fw_update() [ACAB]
         """
         from ._protocol.constants import (
-            L2_MUTABLE_FW_UPDATE_REQ_ID_ACAB,
+            L2_MUTABLE_FW_UPDATE_REQ_ID,
             L2_MUTABLE_FW_UPDATE_DATA_REQ_ID,
         )
 
@@ -144,7 +144,7 @@ class FirmwareUpdater:
         header_data = firmware_data[1:ACAB_FW_HEADER_SIZE]
 
         # Send Mutable_FW_Update request with header
-        l2.send_receive(L2_MUTABLE_FW_UPDATE_REQ_ID_ACAB, header_data)
+        l2.send_receive(L2_MUTABLE_FW_UPDATE_REQ_ID, header_data)
 
         # =====================================================================
         # Phase 2: Send firmware data chunks (Mutable_FW_Update_Data requests)

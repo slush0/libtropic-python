@@ -39,9 +39,8 @@ RANDOM_VALUE_MAX_LEN = 255
 PING_LEN_MAX = 4096
 EDDSA_MSG_LEN_MAX = 4096
 
-# Firmware update limits
-MUTABLE_FW_UPDATE_SIZE_MAX_ABAB = 25600
-MUTABLE_FW_UPDATE_SIZE_MAX_ACAB = 30720
+# Firmware update limits (ACAB silicon)
+MUTABLE_FW_UPDATE_SIZE_MAX = 30720
 
 
 # =============================================================================
