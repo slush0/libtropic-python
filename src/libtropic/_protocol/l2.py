@@ -305,4 +305,3 @@ class L2Layer:
     def mark_startup_sent(self) -> None:
         """Mark that a startup/reboot request was sent (for erratum workaround)."""
         self._startup_req_sent = True
-

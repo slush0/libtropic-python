@@ -60,6 +60,13 @@ Reference: `libtropic-upstream/` for API and test specifications.
 
 ## Development Overview
 
+### Virtual Environment
+
+Always run Python inside the `.venv` virtual environment:
+```bash
+source .venv/bin/activate
+```
+
 ### Structure
 
 ```

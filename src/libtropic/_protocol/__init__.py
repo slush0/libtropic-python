@@ -45,6 +45,13 @@ from .constants import (
     L2_GET_INFO_OBJECT_ID_RISCV_FW_VER,
     L2_GET_INFO_OBJECT_ID_SPECT_FW_VER,
     L2_GET_INFO_OBJECT_ID_FW_BANK,
+    # Handshake constants
+    L2_HANDSHAKE_REQ_LEN,
+    L2_HANDSHAKE_RSP_LEN,
+    HANDSHAKE_RSP_ET_PUB_OFFSET,
+    HANDSHAKE_RSP_ET_PUB_SIZE,
+    HANDSHAKE_RSP_T_AUTH_OFFSET,
+    HANDSHAKE_RSP_T_AUTH_SIZE,
     # Startup IDs
     STARTUP_ID_REBOOT,
     STARTUP_ID_MAINTENANCE,
@@ -54,10 +61,24 @@ from .constants import (
     L2_MAX_FRAME_SIZE,
     L2_CHUNK_MAX_DATA_SIZE,
     REBOOT_DELAY_MS,
+    X25519_KEY_LEN,
+    AES256_KEY_LEN,
+    AESGCM_TAG_SIZE,
+    AESGCM_IV_SIZE,
 )
 from .crc16 import crc16, add_crc, verify_crc
 from .l1 import L1Layer
 from .l2 import L2Layer, L2FrameStatus
+from .l3 import (
+    L3Error,
+    L3NonceOverflowError,
+    L3ResponseSizeError,
+    L3ResultError,
+    encrypt_command,
+    decrypt_response,
+    increment_iv,
+    result_code_to_exception,
+)
 
 __all__ = [
     # Constants
@@ -94,12 +115,22 @@ __all__ = [
     "L2_GET_INFO_OBJECT_ID_RISCV_FW_VER",
     "L2_GET_INFO_OBJECT_ID_SPECT_FW_VER",
     "L2_GET_INFO_OBJECT_ID_FW_BANK",
+    "L2_HANDSHAKE_REQ_LEN",
+    "L2_HANDSHAKE_RSP_LEN",
+    "HANDSHAKE_RSP_ET_PUB_OFFSET",
+    "HANDSHAKE_RSP_ET_PUB_SIZE",
+    "HANDSHAKE_RSP_T_AUTH_OFFSET",
+    "HANDSHAKE_RSP_T_AUTH_SIZE",
     "STARTUP_ID_REBOOT",
     "STARTUP_ID_MAINTENANCE",
     "SLEEP_KIND_SLEEP",
     "L2_MAX_FRAME_SIZE",
     "L2_CHUNK_MAX_DATA_SIZE",
     "REBOOT_DELAY_MS",
+    "X25519_KEY_LEN",
+    "AES256_KEY_LEN",
+    "AESGCM_TAG_SIZE",
+    "AESGCM_IV_SIZE",
     # CRC
     "crc16",
     "add_crc",
@@ -108,5 +139,13 @@ __all__ = [
     "L1Layer",
     "L2Layer",
     "L2FrameStatus",
+    # L3 functions
+    "L3Error",
+    "L3NonceOverflowError",
+    "L3ResponseSizeError",
+    "L3ResultError",
+    "encrypt_command",
+    "decrypt_response",
+    "increment_iv",
+    "result_code_to_exception",
 ]
-

@@ -13,12 +13,16 @@ Test Requirements:
 
 Environment Variables:
     - LIBTROPIC_DEVICE: Device path (default: /dev/ttyACM0)
+    - LIBTROPIC_KEY_CONFIG: Key configuration to use:
+        - "engineering" (default): Engineering sample keys at slot 0
+        - "hwwallet": Hardware wallet example keys at slot 1
     - LIBTROPIC_RUN_DESTRUCTIVE: Set to "1" to run destructive tests
     - LIBTROPIC_RUN_IRREVERSIBLE: Set to "1" to run irreversible tests
 """
 
 import os
 import secrets
+from dataclasses import dataclass
 from typing import Generator
 
 import pytest
@@ -41,16 +45,69 @@ from libtropic import (
 # Default test device path
 DEFAULT_DEVICE = "/dev/ttyACM0"
 
-# Test pairing keys (SH0) - from libtropic C tests
-# WARNING: These are DEFAULT TEST KEYS - never use in production!
-TEST_SH0_PRIV = bytes.fromhex(
-    "d4bb385d67f28e4ab6e308ee92dd5c69"
-    "19ff42b5ae9a40d2e21bd1e8c7a0e69f"
+
+@dataclass
+class KeyConfig:
+    """Configuration for pairing keys used in tests."""
+    name: str
+    private_key: bytes
+    public_key: bytes
+    slot: PairingKeySlot
+
+
+# Engineering sample keys (SH0) - from libtropic_default_sh0_keys.c
+# Used on fresh/virgin TROPIC01 devices
+KEY_CONFIG_ENGINEERING = KeyConfig(
+    name="engineering",
+    private_key=bytes.fromhex(
+        "d09992b1f17abc4db9371768a27da05b"
+        "18fab85613a7842ca64c7910f22e716b"
+    ),
+    public_key=bytes.fromhex(
+        "e7f735ba19a33fd67323ab37262de536"
+        "08ca578576534352e18f64e613d38d54"
+    ),
+    slot=PairingKeySlot.SLOT_0,
 )
-TEST_SH0_PUB = bytes.fromhex(
-    "92b8afd0f31b75c29a9b6f1f1e9b9f8e"
-    "7c6d5a4b3c2d1e0f1a2b3c4d5e6f7a8b"
+
+# Hardware wallet example keys (SH1) - from lt_ex_hw_wallet.c
+# Used on devices configured with the HW wallet example
+KEY_CONFIG_HWWALLET = KeyConfig(
+    name="hwwallet",
+    private_key=bytes.fromhex(
+        "58c48188f8b1cbd419002e9c8df8ceea"
+        "f3a911deb66bc887aee78810fb48b674"
+    ),
+    public_key=bytes.fromhex(
+        "e1dcf9c346bcf2e78ba8f027d80a8a33"
+        "ccf3e9df6bdf65a2c1aec4d921e18d51"
+    ),
+    slot=PairingKeySlot.SLOT_1,
 )
+
+# Map of available key configurations
+KEY_CONFIGS = {
+    "engineering": KEY_CONFIG_ENGINEERING,
+    "hwwallet": KEY_CONFIG_HWWALLET,
+}
+
+
+def get_key_config() -> KeyConfig:
+    """Get the active key configuration from environment variable."""
+    config_name = os.environ.get("LIBTROPIC_KEY_CONFIG", "engineering").lower()
+    if config_name not in KEY_CONFIGS:
+        valid_options = ", ".join(KEY_CONFIGS.keys())
+        raise ValueError(
+            f"Invalid LIBTROPIC_KEY_CONFIG='{config_name}'. "
+            f"Valid options: {valid_options}"
+        )
+    return KEY_CONFIGS[config_name]
+
+
+# Legacy exports for backward compatibility (use engineering keys by default)
+# Tests should use the key_config fixture instead for dynamic configuration
+TEST_SH0_PRIV = KEY_CONFIG_ENGINEERING.private_key
+TEST_SH0_PUB = KEY_CONFIG_ENGINEERING.public_key
 
 # Limits from TROPIC01 specification
 ECC_SLOT_MIN = 0
@@ -115,6 +172,20 @@ def device_path() -> str:
 
 
 @pytest.fixture
+def key_config() -> KeyConfig:
+    """
+    Get active key configuration based on LIBTROPIC_KEY_CONFIG env var.
+
+    Returns:
+        KeyConfig with private_key, public_key, and slot fields.
+
+    Environment Variable:
+        LIBTROPIC_KEY_CONFIG: "engineering" (default) or "hwwallet"
+    """
+    return get_key_config()
+
+
+@pytest.fixture
 def device(device_path: str) -> Generator[Tropic01, None, None]:
     """
     Provide initialized Tropic01 device (no session).
@@ -130,18 +201,22 @@ def device(device_path: str) -> Generator[Tropic01, None, None]:
 
 
 @pytest.fixture
-def device_with_session(device_path: str) -> Generator[Tropic01, None, None]:
+def device_with_session(device_path: str, key_config: KeyConfig) -> Generator[Tropic01, None, None]:
     """
-    Provide Tropic01 device with active secure session using SH0 keys.
+    Provide Tropic01 device with active secure session.
+
+    Uses keys configured via LIBTROPIC_KEY_CONFIG environment variable:
+        - "engineering": Engineering sample keys at slot 0 (default)
+        - "hwwallet": Hardware wallet example keys at slot 1
 
     Use for tests that require L3 (session-protected) operations.
     """
     dev = Tropic01(device_path)
     dev.open()
-    dev.start_session(
-        private_key=TEST_SH0_PRIV,
-        public_key=TEST_SH0_PUB,
-        slot=PairingKeySlot.SLOT_0
+    dev.verify_chip_and_start_session(
+        private_key=key_config.private_key,
+        public_key=key_config.public_key,
+        slot=key_config.slot
     )
     try:
         yield dev

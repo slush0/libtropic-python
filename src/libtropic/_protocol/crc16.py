@@ -96,4 +96,3 @@ def verify_crc(frame: bytes) -> bool:
     calculated_crc = crc16(frame[:crc_data_len])
 
     return expected_crc == calculated_crc
-

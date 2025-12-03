@@ -241,4 +241,3 @@ class L1Layer:
         """Check if chip is ready to accept commands."""
         status = self.get_chip_status()
         return bool(status & L1_CHIP_MODE_READY)
-

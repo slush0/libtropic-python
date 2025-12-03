@@ -4,8 +4,12 @@ Main TROPIC01 device interface for libtropic.
 Provides the primary entry point for communicating with TROPIC01 secure elements.
 """
 
+import os
+import secrets
+from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
+from typing import Optional
 
 from .counters import MonotonicCounters
 from .crypto.ecc import EccKeys
@@ -18,7 +22,11 @@ from .enums import (
     StartupMode,
 )
 from .exceptions import (
+    AuthenticationError,
     DeviceAlarmError,
+    HandshakeError,
+    NoSessionError,
+    ParamError,
     RebootError,
     TropicError,
 )
@@ -41,6 +49,8 @@ from ._protocol import (
     L1_CHIP_MODE_ALARM,
     L1_CHIP_MODE_STARTUP,
     L2_GET_INFO_REQ_ID,
+    L2_HANDSHAKE_REQ_ID,
+    L2_ENCRYPTED_CMD_REQ_ID,
     L2_STARTUP_REQ_ID,
     L2_SLEEP_REQ_ID,
     L2_GET_LOG_REQ_ID,
@@ -48,12 +58,65 @@ from ._protocol import (
     L2_GET_INFO_OBJECT_ID_RISCV_FW_VER,
     L2_GET_INFO_OBJECT_ID_SPECT_FW_VER,
     L2_GET_INFO_OBJECT_ID_FW_BANK,
+    L2_HANDSHAKE_RSP_LEN,
+    HANDSHAKE_RSP_ET_PUB_SIZE,
+    HANDSHAKE_RSP_T_AUTH_SIZE,
     STARTUP_ID_REBOOT,
     STARTUP_ID_MAINTENANCE,
     SLEEP_KIND_SLEEP,
     REBOOT_DELAY_MS,
+    X25519_KEY_LEN,
+    AESGCM_IV_SIZE,
+    encrypt_command,
+    decrypt_response,
+    result_code_to_exception,
+    L3ResultError,
 )
 from ._protocol.l1 import L1ChipAlarm
+from ._cal import (
+    x25519,
+    x25519_scalarmult_base,
+    hkdf,
+    sha256,
+    Sha256Context,
+    AesGcmDecryptContext,
+    secure_memzero,
+)
+
+
+@dataclass
+class SessionState:
+    """
+    Holds secure session state for TROPIC01 communication.
+
+    Created during session handshake and used for L3 command encryption.
+    """
+
+    # 32-byte AES-256 key for encrypting commands (host -> device)
+    k_cmd: bytes
+
+    # 32-byte AES-256 key for decrypting responses (device -> host)
+    k_res: bytes
+
+    # 12-byte IV for command encryption (incremented after each command)
+    cmd_iv: bytearray
+
+    # 12-byte IV for response decryption (incremented after each response)
+    res_iv: bytearray
+
+    def clear(self) -> None:
+        """Securely clear all session key material from memory."""
+        # Clear keys using secure memory wipe
+        if self.k_cmd:
+            key_buffer = bytearray(self.k_cmd)
+            secure_memzero(key_buffer)
+        if self.k_res:
+            key_buffer = bytearray(self.k_res)
+            secure_memzero(key_buffer)
+
+        # Clear IVs
+        secure_memzero(self.cmd_iv)
+        secure_memzero(self.res_iv)
 
 
 class Tropic01:
@@ -144,6 +207,9 @@ class Tropic01:
         # Protocol layers (initialized on open)
         self._l2: L2Layer | None = None
 
+        # Secure session state (populated by start_session)
+        self._session: SessionState | None = None
+
         # Sub-modules (lazily initialized)
         self._ecc: EccKeys | None = None
         self._random: RandomGenerator | None = None
@@ -214,7 +280,10 @@ class Tropic01:
             except Exception:
                 pass
 
-        # Clear session state
+        # Clear session state (securely wipe key material)
+        if self._session is not None:
+            self._session.clear()
+            self._session = None
         self._has_session = False
         self._l2 = None
 
@@ -236,6 +305,129 @@ class Tropic01:
         if not self._is_open or self._l2 is None:
             raise RuntimeError("Device not open. Call open() first or use as context manager.")
         return self._l2
+
+    def _ensure_session(self) -> SessionState:
+        """
+        Ensure device is open and session is active.
+
+        Returns:
+            Active session state
+
+        Raises:
+            RuntimeError: If device not open
+            NoSessionError: If no active session
+        """
+        self._ensure_open()
+        if not self._has_session or self._session is None:
+            raise NoSessionError(
+                ReturnCode.HOST_NO_SESSION,
+                "No active session. Call start_session() first."
+            )
+        return self._session
+
+    def _send_l3_command(self, cmd_id: int, data: bytes = b"") -> bytes:
+        """
+        Send encrypted L3 command and receive decrypted response.
+
+        This is the core method for all session-protected operations.
+        It encrypts the command, sends it via L2, and decrypts the response.
+
+        For large L3 payloads (> 252 bytes), the encrypted data is split
+        into chunks and sent separately. The response may also come in
+        multiple chunks.
+
+        Args:
+            cmd_id: L3 command identifier
+            data: Command data (may be empty)
+
+        Returns:
+            Response data (excluding result code)
+
+        Raises:
+            NoSessionError: If no active session
+            L3ResultError: If command returns error result
+            Various TropicError subclasses: Mapped from L3 result codes
+        """
+        from ._protocol.l2 import L2FrameStatus
+        from ._protocol.constants import L2_CHUNK_MAX_DATA_SIZE
+
+        session = self._ensure_session()
+        l2 = self._l2
+
+        # Encrypt command
+        encrypted_cmd = encrypt_command(session, cmd_id, data)
+
+        # Send encrypted command in chunks (max 252 bytes per L2 frame)
+        packet_size = len(encrypted_cmd)
+        offset = 0
+
+        while offset < packet_size:
+            # Calculate chunk size
+            remaining = packet_size - offset
+            chunk_size = min(remaining, L2_CHUNK_MAX_DATA_SIZE)
+            chunk = encrypted_cmd[offset:offset + chunk_size]
+            offset += chunk_size
+
+            # Send chunk
+            l2.send(L2_ENCRYPTED_CMD_REQ_ID, chunk)
+
+            # Receive acknowledgment
+            ack_response = l2.receive()
+
+            # Check status
+            if ack_response.status == L2FrameStatus.REQUEST_CONT:
+                # More chunks expected - continue sending
+                continue
+            elif ack_response.status == L2FrameStatus.REQUEST_OK:
+                # All chunks sent, command accepted
+                break
+            elif ack_response.status == L2FrameStatus.RESULT_OK:
+                # Small response came immediately with request
+                # (This shouldn't happen during multi-chunk send)
+                break
+            else:
+                raise TropicError(
+                    ReturnCode.FAIL,
+                    f"Unexpected L2 status during command send: {ack_response.status.name}"
+                )
+
+        # Receive response (may also come in chunks)
+        response_chunks = []
+
+        while True:
+            # If we already got RESULT_OK with data, use that
+            if ack_response.status == L2FrameStatus.RESULT_OK:
+                response_chunks.append(ack_response.data)
+                break
+
+            # Poll for response
+            result_response = l2.receive()
+
+            if result_response.status == L2FrameStatus.RESULT_CONT:
+                # More response chunks coming
+                response_chunks.append(result_response.data)
+                continue
+            elif result_response.status == L2FrameStatus.RESULT_OK:
+                # Final response chunk
+                response_chunks.append(result_response.data)
+                break
+            else:
+                raise TropicError(
+                    ReturnCode.FAIL,
+                    f"Unexpected L2 status during response receive: {result_response.status.name}"
+                )
+
+        # Concatenate all response chunks
+        response_data = b"".join(response_chunks)
+
+        # Decrypt response
+        try:
+            result_code, decrypted_data = decrypt_response(session, response_data)
+        except L3ResultError as e:
+            # Convert L3 result error to appropriate exception type
+            raise result_code_to_exception(e.result_code) from e
+
+        return decrypted_data
 
     @property
     def mode(self) -> DeviceMode:
@@ -452,24 +644,136 @@ class Tropic01:
 
         Maps to: lt_get_info_cert_store()
         """
-        # TODO: Implement certificate store reading with proper ASN.1 parsing
-        # This requires reading multiple 128-byte blocks and parsing the
-        # certificate store header to determine certificate boundaries
-        raise NotImplementedError("Certificate store reading not yet implemented")
+        from ._protocol.constants import (
+            L2_GET_INFO_OBJECT_ID_X509_CERT,
+            GET_INFO_CERT_CHUNK_SIZE,
+        )
+
+        l2 = self._ensure_open()
+
+        # Certificate store constants
+        CERT_STORE_VERSION = 0x01
+        NUM_CERTIFICATES = 4
+        HEADER_SIZE = 2 + (NUM_CERTIFICATES * 2)  # version + num_certs + 4x length
+        MAX_CERT_SIZE = 1024  # Maximum size for a single certificate
+
+        # Read first block to get header
+        response = l2.send_receive(
+            L2_GET_INFO_REQ_ID,
+            bytes([L2_GET_INFO_OBJECT_ID_X509_CERT, 0])  # block_index = 0
+        )
+
+        if len(response.data) != GET_INFO_CERT_CHUNK_SIZE:
+            raise TropicError(
+                ReturnCode.FAIL,
+                f"Invalid certificate store response: {len(response.data)} bytes"
+            )
+
+        # Parse header
+        data = response.data
+        version = data[0]
+        if version != CERT_STORE_VERSION:
+            raise TropicError(
+                ReturnCode.CERT_STORE_INVALID,
+                f"Invalid certificate store version: {version}"
+            )
+
+        num_certs = data[1]
+        if num_certs != NUM_CERTIFICATES:
+            raise TropicError(
+                ReturnCode.CERT_STORE_INVALID,
+                f"Unexpected certificate count: {num_certs}"
+            )
+
+        # Extract certificate lengths (big-endian)
+        cert_lengths = []
+        for i in range(NUM_CERTIFICATES):
+            offset = 2 + (i * 2)
+            cert_len = (data[offset] << 8) | data[offset + 1]
+            cert_lengths.append(cert_len)
+
+        # Calculate total size needed and blocks to read
+        total_cert_size = sum(cert_lengths)
+        total_size = HEADER_SIZE + total_cert_size
+        num_blocks = (total_size + GET_INFO_CERT_CHUNK_SIZE - 1) // GET_INFO_CERT_CHUNK_SIZE
+
+        # Collect all blocks
+        all_data = bytearray(data)
+        for block_idx in range(1, num_blocks):
+            response = l2.send_receive(
+                L2_GET_INFO_REQ_ID,
+                bytes([L2_GET_INFO_OBJECT_ID_X509_CERT, block_idx])
+            )
+            all_data.extend(response.data)
+
+        # Extract certificates
+        cert_offset = HEADER_SIZE
+        certs = []
+        for i, cert_len in enumerate(cert_lengths):
+            cert_data = bytes(all_data[cert_offset:cert_offset + cert_len])
+            certs.append(cert_data)
+            cert_offset += cert_len
+
+        return CertificateStore(
+            device_cert=certs[0],
+            intermediate_cert=certs[1],
+            tropic01_cert=certs[2],
+            root_cert=certs[3],
+        )
 
     def get_device_public_key(self) -> bytes:
         """
         Extract device public key (ST_Pub) from certificate store.
 
         Returns the X25519 public key used for secure session establishment.
+        The key is extracted from the device certificate by searching for the
+        X25519 OID (1.3.101.110) and extracting the following public key value.
 
         Returns:
             32-byte X25519 public key
 
         Maps to: lt_get_st_pub()
         """
-        # TODO: Implement by parsing device certificate from get_certificate_store()
-        raise NotImplementedError("Device public key extraction not yet implemented")
+        # Get certificate store and extract device certificate
+        cert_store = self.get_certificate_store()
+        cert_data = cert_store.device_cert
+
+        # X25519 OID: 1.3.101.110 encoded as 2B 65 6E
+        # In ASN.1 DER: 06 03 2B 65 6E (tag=06, length=03, data=2B656E)
+        X25519_OID = bytes([0x06, 0x03, 0x2B, 0x65, 0x6E])
+
+        # Search for the OID in the certificate
+        oid_pos = cert_data.find(X25519_OID)
+        if oid_pos == -1:
+            raise TropicError(
+                ReturnCode.CERT_ITEM_NOT_FOUND,
+                "X25519 OID not found in device certificate"
+            )
+
+        # After the OID, we expect BIT STRING containing the public key
+        # BIT STRING format: 03 <length> 00 <key_bytes>
+        # The 00 byte is the "unused bits" indicator
+        pos = oid_pos + len(X25519_OID)
+
+        # Skip to the BIT STRING (may be in next sequence level)
+        # Look for tag 0x03 (BIT STRING)
+        while pos < len(cert_data) - 2:
+            if cert_data[pos] == 0x03:  # BIT STRING tag
+                # Get length
+                length = cert_data[pos + 1]
+                if length == 0x21:  # 33 bytes (1 unused bits byte + 32 key bytes)
+                    # Skip unused bits indicator (should be 0x00)
+                    if cert_data[pos + 2] == 0x00:
+                        key_start = pos + 3
+                        key_end = key_start + X25519_KEY_LEN
+                        if key_end <= len(cert_data):
+                            return cert_data[key_start:key_end]
+            pos += 1
+
+        raise TropicError(
+            ReturnCode.CERT_ITEM_NOT_FOUND,
+            "Could not extract X25519 public key from device certificate"
+        )
 
     # =========================================================================
     # Device Control
@@ -538,37 +842,195 @@ class Tropic01:
 
     def start_session(
         self,
+        stpub: bytes,
+        slot: int | PairingKeySlot,
         private_key: bytes,
         public_key: bytes,
-        slot: int | PairingKeySlot = 0
     ) -> None:
         """
-        Establish encrypted secure session.
+        Establish encrypted secure session using Noise_KK1 protocol.
 
-        Performs X25519 key exchange with the device to establish an
-        encrypted communication channel. Most operations require an
-        active session.
+        Low-level session start that requires all parameters to be provided
+        by the caller. For a higher-level helper that auto-fetches the device
+        public key from certificates, use `verify_chip_and_start_session()`.
+
+        The protocol implements Noise_KK1_25519_AESGCM_SHA256:
+        1. Builds a hash chain from protocol name and public keys
+        2. Derives session keys via 3 DH operations and HKDF chain
+        3. Verifies device authentication tag
 
         Args:
-            private_key: 32-byte X25519 private key (host pairing key)
-            public_key: 32-byte X25519 public key (host pairing key)
-            slot: Pairing key slot index (0-3) where public_key is stored
+            stpub: 32-byte device static public key (from certificate store)
+            slot: Pairing key slot index (0-3) where host public_key is stored
+            private_key: 32-byte X25519 host private key (SH_priv)
+            public_key: 32-byte X25519 host public key (SH_pub)
 
         Raises:
             ParamError: If keys are invalid or slot out of range
             HandshakeError: If key exchange fails
+            AuthenticationError: If device authentication tag verification fails
 
-        Maps to: lt_session_start()
+        Maps to: lt_session_start(h, stpub, pkey_index, shipriv, shipub)
         """
-        # TODO: Implement secure session establishment with X25519 handshake
-        # This requires:
-        # 1. Generate ephemeral X25519 keypair
-        # 2. Send HANDSHAKE L2 request with ephemeral public key
-        # 3. Receive device ephemeral public key and auth tag
-        # 4. Derive session keys using HKDF
-        # 5. Verify auth tag
-        # 6. Store session keys for L3 encryption
-        raise NotImplementedError("Session start not yet implemented")
+        # Validate parameters
+        if len(stpub) != X25519_KEY_LEN:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Device public key (stpub) must be {X25519_KEY_LEN} bytes, got {len(stpub)}"
+            )
+        if len(private_key) != X25519_KEY_LEN:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Private key must be {X25519_KEY_LEN} bytes, got {len(private_key)}"
+            )
+        if len(public_key) != X25519_KEY_LEN:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Public key must be {X25519_KEY_LEN} bytes, got {len(public_key)}"
+            )
+
+        # Convert slot to int if enum
+        slot_index = int(slot) if isinstance(slot, PairingKeySlot) else slot
+        if slot_index < 0 or slot_index > 3:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Slot must be 0-3, got {slot_index}"
+            )
+
+        l2 = self._ensure_open()
+
+        # Use provided keys
+        st_pub = stpub
+        sh_pub = public_key
+
+        # Generate ephemeral X25519 keypair (EH_priv, EH_pub)
+        eh_priv = secrets.token_bytes(X25519_KEY_LEN)
+        eh_pub = x25519_scalarmult_base(eh_priv)
+
+        try:
+            # Send HANDSHAKE L2 request: [EH_pub (32B), slot (1B)]
+            request_data = eh_pub + bytes([slot_index])
+            response = l2.send_receive(L2_HANDSHAKE_REQ_ID, request_data)
+
+            # Validate response length
+            if len(response.data) != L2_HANDSHAKE_RSP_LEN:
+                raise HandshakeError(
+                    ReturnCode.L2_HSK_ERR,
+                    f"Invalid handshake response length: {len(response.data)}"
+                )
+
+            # Parse response: [ET_pub (32B), T_auth (16B)]
+            et_pub = response.data[:HANDSHAKE_RSP_ET_PUB_SIZE]
+            t_auth = response.data[HANDSHAKE_RSP_ET_PUB_SIZE:
+                                   HANDSHAKE_RSP_ET_PUB_SIZE + HANDSHAKE_RSP_T_AUTH_SIZE]
+
+            # =====================================================================
+            # Noise_KK1_25519_AESGCM_SHA256 Protocol
+            # =====================================================================
+
+            # Protocol name: "Noise_KK1_25519_AESGCM_SHA256" padded to 32 bytes
+            protocol_name = b'Noise_KK1_25519_AESGCM_SHA256\x00\x00\x00'
+
+            # Build hash chain (h) - this becomes the AAD for tag verification
+            ctx = Sha256Context()
+
+            # h = SHA256(protocol_name)
+            ctx.start()
+            ctx.update(protocol_name)
+            h = ctx.finish()
+
+            # h = SHA256(h || SHiPUB) - host's static public key
+            ctx.start()
+            ctx.update(h)
+            ctx.update(sh_pub)
+            h = ctx.finish()
+
+            # h = SHA256(h || STPUB) - device's static public key
+            ctx.start()
+            ctx.update(h)
+            ctx.update(st_pub)
+            h = ctx.finish()
+
+            # h = SHA256(h || EHPUB) - host's ephemeral public key
+            ctx.start()
+            ctx.update(h)
+            ctx.update(eh_pub)
+            h = ctx.finish()
+
+            # h = SHA256(h || PKEY_INDEX) - pairing key slot index
+            ctx.start()
+            ctx.update(h)
+            ctx.update(bytes([slot_index]))
+            h = ctx.finish()
+
+            # h = SHA256(h || ETPUB) - device's ephemeral public key
+            ctx.start()
+            ctx.update(h)
+            ctx.update(et_pub)
+            h = ctx.finish()
+
+            # =====================================================================
+            # Key Derivation via HKDF Chain
+            # =====================================================================
+
+            # ck = HKDF(protocol_name, X25519(EHPRIV, ETPUB))
+            # First DH: ephemeral-ephemeral
+            ss_ee = x25519(eh_priv, et_pub)
+            ck, _ = hkdf(protocol_name, ss_ee)
+
+            # ck = HKDF(ck, X25519(SHiPRIV, ETPUB))
+            # Second DH: static-ephemeral
+            ss_se = x25519(private_key, et_pub)
+            ck, _ = hkdf(ck, ss_se)
+
+            # (ck, kAUTH) = HKDF(ck, X25519(EHPRIV, STPUB))
+            # Third DH: ephemeral-static
+            ss_es = x25519(eh_priv, st_pub)
+            ck, k_auth = hkdf(ck, ss_es)
+
+            # (kCMD, kRES) = HKDF(ck, "")
+            # Final derivation with empty input
+            k_cmd, k_res = hkdf(ck, b"")
+
+            # =====================================================================
+            # Verify Authentication Tag
+            # =====================================================================
+
+            # The device computes T_auth = AES-GCM-Tag(k_auth, IV=0, AAD=h, plaintext="")
+            # We verify by attempting to decrypt the tag with hash as AAD
+            iv_zero = bytes(AESGCM_IV_SIZE)
+
+            try:
+                with AesGcmDecryptContext(k_auth) as decrypt_ctx:
+                    # Decrypt: ciphertext is empty, tag is t_auth, AAD is hash chain
+                    # If tag is valid, decrypt returns empty bytes
+                    decrypt_ctx.decrypt(iv_zero, t_auth, h)
+            except Exception as e:
+                raise AuthenticationError(
+                    ReturnCode.L2_TAG_ERR,
+                    f"Handshake authentication tag verification failed: {e}"
+                ) from e
+
+            # =====================================================================
+            # Store Session State
+            # =====================================================================
+
+            # Initialize IVs to all zeros
+            cmd_iv = bytearray(AESGCM_IV_SIZE)
+            res_iv = bytearray(AESGCM_IV_SIZE)
+
+            self._session = SessionState(
+                k_cmd=k_cmd,
+                k_res=k_res,
+                cmd_iv=cmd_iv,
+                res_iv=res_iv,
+            )
+            self._has_session = True
+
+        finally:
+            # Securely clear ephemeral private key and shared secrets
+            eh_priv_buffer = bytearray(eh_priv)
+            secure_memzero(eh_priv_buffer)
 
     def abort_session(self) -> None:
         """
@@ -590,15 +1052,50 @@ class Tropic01:
             except Exception:
                 pass  # Ignore errors during abort
 
-        # Clear session state
+        # Clear session state (securely wipe key material)
+        if self._session is not None:
+            self._session.clear()
+            self._session = None
         self._has_session = False
+
+    def verify_chip_and_start_session(
+        self,
+        private_key: bytes,
+        public_key: bytes,
+        slot: int | PairingKeySlot = 0,
+    ) -> None:
+        """
+        Verify device certificate and establish secure session.
+
+        High-level helper that automatically fetches the device's static
+        public key from the certificate store before starting the session.
+        This is the recommended way to start a session for most use cases.
+
+        Args:
+            private_key: 32-byte X25519 host private key (SH_priv)
+            public_key: 32-byte X25519 host public key (SH_pub)
+            slot: Pairing key slot index (0-3) where host public_key is stored
+
+        Raises:
+            ParamError: If keys are invalid or slot out of range
+            HandshakeError: If key exchange fails
+            AuthenticationError: If device authentication tag verification fails
+            TropicError: If certificate store cannot be read
+
+        Maps to: lt_verify_chip_and_start_secure_session(h, shipriv, shipub, pkey_index)
+        """
+        # Get device's static public key from certificate store
+        stpub = self.get_device_public_key()
+
+        # Start session with all parameters
+        self.start_session(stpub, slot, private_key, public_key)
 
     @property
     def has_session(self) -> bool:
         """Check if a secure session is currently active."""
         return self._has_session
 
-    def ping(self, data: bytes) -> bytes:
+    def ping(self, data: bytes = b"") -> bytes:
         """
         Echo test through secure channel.
 
@@ -606,7 +1103,7 @@ class Tropic01:
         Useful for verifying session is working correctly.
 
         Args:
-            data: Data to echo (max 255 bytes)
+            data: Data to echo (max 4096 bytes, default empty)
 
         Returns:
             Echoed data (should match input)
@@ -617,9 +1114,18 @@ class Tropic01:
 
         Maps to: lt_ping()
         """
-        # TODO: Implement ping through L3 encrypted channel
-        # This requires an active session and L3 command encoding
-        raise NotImplementedError("Ping not yet implemented (requires session)")
+        from ._protocol.constants import L3_CMD_PING, L3_PING_DATA_MAX
+
+        if len(data) > L3_PING_DATA_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Ping data too large: {len(data)} bytes (max {L3_PING_DATA_MAX})"
+            )
+
+        # Send ping command and receive echoed data
+        response_data = self._send_l3_command(L3_CMD_PING, data)
+
+        return response_data
 
     # =========================================================================
     # Logging (Debug)
