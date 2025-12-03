@@ -11,7 +11,7 @@
 - **Test coverage must mirror libtropic C tests** — port all C unit tests to Python equivalents.
 - **No feature creep** — if it doesn't exist in libtropic C, don't implement it here. Out of scope.
 
-Reference: `../libtropic/` for API and test specifications.
+Reference: `libtropic-upstream/` for API and test specifications.
 
 ---
 

@@ -4,7 +4,7 @@ Pairing key operations for libtropic.
 Manages the X25519 pairing keys used for secure session establishment.
 """
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from .enums import PairingKeySlot
 from .types import X25519_KEY_LEN
@@ -57,7 +57,7 @@ class PairingKeys:
 
     def write(
         self,
-        slot: Union[int, PairingKeySlot],
+        slot: int | PairingKeySlot,
         public_key: bytes
     ) -> None:
         """
@@ -83,7 +83,7 @@ class PairingKeys:
         """
         raise NotImplementedError()
 
-    def read(self, slot: Union[int, PairingKeySlot]) -> bytes:
+    def read(self, slot: int | PairingKeySlot) -> bytes:
         """
         Read pairing public key from slot.
 
@@ -104,7 +104,7 @@ class PairingKeys:
         """
         raise NotImplementedError()
 
-    def invalidate(self, slot: Union[int, PairingKeySlot]) -> None:
+    def invalidate(self, slot: int | PairingKeySlot) -> None:
         """
         Permanently invalidate pairing key slot.
 

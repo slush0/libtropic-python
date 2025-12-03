@@ -5,32 +5,30 @@ Provides the primary entry point for communicating with TROPIC01 secure elements
 """
 
 from pathlib import Path
-from typing import Optional, Union
+from types import TracebackType
 
-from .enums import (
-    DeviceMode,
-    StartupMode,
-    PairingKeySlot,
-    FirmwareBank,
-)
-from .types import (
-    ChipId,
-    FirmwareVersion,
-    FirmwareHeader,
-    CertificateStore,
-    X25519_KEY_LEN,
-)
-from .transport.base import Transport
-from .transport.usb_dongle import UsbDongleTransport, UsbDongleConfig
-from .transport.spi import LinuxSpiTransport, SpiConfig
+from .counters import MonotonicCounters
 from .crypto.ecc import EccKeys
 from .crypto.random import RandomGenerator
-from .storage.memory import DataMemory
-from .storage.config import Configuration
-from .counters import MonotonicCounters
+from .enums import (
+    DeviceMode,
+    FirmwareBank,
+    PairingKeySlot,
+    StartupMode,
+)
+from .firmware import FirmwareUpdater
 from .mac_and_destroy import MacAndDestroy
 from .pairing_keys import PairingKeys
-from .firmware import FirmwareUpdater
+from .storage.config import Configuration
+from .storage.memory import DataMemory
+from .transport.base import Transport
+from .transport.usb_dongle import UsbDongleConfig, UsbDongleTransport
+from .types import (
+    CertificateStore,
+    ChipId,
+    FirmwareHeader,
+    FirmwareVersion,
+)
 
 
 class Tropic01:
@@ -78,7 +76,7 @@ class Tropic01:
 
     def __init__(
         self,
-        transport: Union[str, Path, Transport, None] = None
+        transport: str | Path | Transport | None = None
     ):
         """
         Initialize TROPIC01 device interface.
@@ -103,6 +101,7 @@ class Tropic01:
         if transport is None:
             transport = "/dev/ttyACM0"
 
+        self._transport: Transport
         if isinstance(transport, (str, Path)):
             # String path = USB dongle transport
             config = UsbDongleConfig(device_path=str(transport))
@@ -118,14 +117,14 @@ class Tropic01:
         self._has_session = False
 
         # Sub-modules (lazily initialized)
-        self._ecc: Optional[EccKeys] = None
-        self._random: Optional[RandomGenerator] = None
-        self._memory: Optional[DataMemory] = None
-        self._config: Optional[Configuration] = None
-        self._counters: Optional[MonotonicCounters] = None
-        self._mac_and_destroy: Optional[MacAndDestroy] = None
-        self._pairing_keys: Optional[PairingKeys] = None
-        self._firmware: Optional[FirmwareUpdater] = None
+        self._ecc: EccKeys | None = None
+        self._random: RandomGenerator | None = None
+        self._memory: DataMemory | None = None
+        self._config: Configuration | None = None
+        self._counters: MonotonicCounters | None = None
+        self._mac_and_destroy: MacAndDestroy | None = None
+        self._pairing_keys: PairingKeys | None = None
+        self._firmware: FirmwareUpdater | None = None
 
     # =========================================================================
     # Context Manager
@@ -136,7 +135,12 @@ class Tropic01:
         self.open()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None
+    ) -> None:
         """Context manager exit - closes connection and releases resources."""
         self.close()
 
@@ -302,7 +306,7 @@ class Tropic01:
         self,
         private_key: bytes,
         public_key: bytes,
-        slot: Union[int, PairingKeySlot] = 0
+        slot: int | PairingKeySlot = 0
     ) -> None:
         """
         Establish encrypted secure session.

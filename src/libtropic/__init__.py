@@ -33,65 +33,66 @@ from .device import Tropic01
 
 # Enumerations
 from .enums import (
-    ReturnCode,
+    CertKind,
+    ConfigAddress,
     DeviceMode,
-    StartupMode,
     EccCurve,
     EccKeyOrigin,
-    FirmwareBank,
-    PairingKeySlot,
     EccSlot,
-    McounterIndex,
+    FirmwareBank,
     MacAndDestroySlot,
-    ConfigAddress,
-    CertKind,
-)
-
-# Data types
-from .types import (
-    ChipId,
-    FirmwareVersion,
-    FirmwareHeader,
-    CertificateStore,
-    EccKeyInfo,
-    DeviceConfig,
-    SerialNumber,
+    McounterIndex,
+    PairingKeySlot,
+    ReturnCode,
+    StartupMode,
 )
 
 # Exceptions
 from .exceptions import (
-    TropicError,
-    NoSessionError,
-    ParamError,
+    AuthenticationError,
+    CertificateError,
+    ConnectionError,
+    CounterInvalidError,
+    CrcError,
     CryptoError,
     DeviceAlarmError,
-    UnauthorizedError,
-    SlotError,
+    HandshakeError,
+    HardwareError,
+    InvalidKeyError,
+    NoSessionError,
+    ParamError,
+    RebootError,
     SlotEmptyError,
-    SlotNotEmptyError,
+    SlotError,
     SlotExpiredError,
     SlotInvalidError,
-    InvalidKeyError,
-    CounterInvalidError,
-    HardwareError,
-    HandshakeError,
-    AuthenticationError,
-    CrcError,
-    CertificateError,
-    RebootError,
-    TransportError,
+    SlotNotEmptyError,
     TimeoutError,
-    ConnectionError,
+    TransportError,
+    TropicError,
+    UnauthorizedError,
 )
 
 # Transport layer
 from .transport import (
-    Transport,
     LinuxSpiTransport,
     SpiConfig,
-    UsbDongleTransport,
+    Transport,
     UsbDongleConfig,
+    UsbDongleTransport,
 )
+
+# Data types
+from .types import (
+    CertificateStore,
+    ChipId,
+    DeviceConfig,
+    EccKeyInfo,
+    FirmwareHeader,
+    FirmwareVersion,
+    SerialNumber,
+)
+
 
 # Factory functions for common configurations
 def connect_usb_dongle(
@@ -127,7 +128,7 @@ def connect_spi(
     spi_speed_hz: int = 1_000_000,
     gpio_chip: str = "/dev/gpiochip0",
     cs_pin: int = 8,
-    int_pin: int = None
+    int_pin: int | None = None
 ) -> Tropic01:
     """
     Connect to TROPIC01 via native Linux SPI.

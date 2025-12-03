@@ -4,7 +4,7 @@ Firmware update operations for libtropic.
 Provides firmware update functionality for TROPIC01 (maintenance mode only).
 """
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from .enums import FirmwareBank
 from .types import (
@@ -61,7 +61,7 @@ class FirmwareUpdater:
         """
         self._device = device
 
-    def erase(self, bank: Union[FirmwareBank, int]) -> None:
+    def erase(self, bank: FirmwareBank | int) -> None:
         """
         Erase firmware bank (ABAB silicon only).
 
@@ -85,7 +85,7 @@ class FirmwareUpdater:
 
     def update(
         self,
-        bank: Union[FirmwareBank, int],
+        bank: FirmwareBank | int,
         firmware_data: bytes
     ) -> None:
         """
@@ -115,7 +115,7 @@ class FirmwareUpdater:
 
     def update_complete(
         self,
-        bank: Union[FirmwareBank, int],
+        bank: FirmwareBank | int,
         firmware_data: bytes
     ) -> None:
         """

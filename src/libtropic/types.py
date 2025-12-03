@@ -4,11 +4,9 @@ Data types for libtropic Python bindings.
 Provides dataclasses and typed structures matching the C SDK.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, List, Tuple
+from dataclasses import dataclass
 
 from .enums import EccCurve, EccKeyOrigin
-
 
 # =============================================================================
 # Constants
@@ -65,9 +63,9 @@ class ChipId:
     programmer_version: bytes      # 4 bytes - Programmer version
     serial_number: bytes           # Full serial number data
     part_number: str               # Full part number string
-    prov_template_version: Tuple[int, int]  # (major, minor)
+    prov_template_version: tuple[int, int]  # (major, minor)
     prov_template_tag: bytes       # 4 bytes
-    prov_spec_version: Tuple[int, int]      # (major, minor)
+    prov_spec_version: tuple[int, int]      # (major, minor)
     prov_spec_tag: bytes           # 4 bytes
     batch_id: bytes                # 4 bytes
 
@@ -99,7 +97,7 @@ class FirmwareHeader:
     git_hash: bytes                # Git commit hash
     content_hash: bytes            # SHA256 hash of firmware content
     header_version: int = 1        # Header format version
-    pair_version: Optional[int] = None  # Paired version (boot v2 only)
+    pair_version: int | None = None  # Paired version (boot v2 only)
 
 
 # =============================================================================
@@ -119,7 +117,7 @@ class CertificateStore:
     root_cert: bytes               # Root CA certificate
 
     @property
-    def certificates(self) -> List[bytes]:
+    def certificates(self) -> list[bytes]:
         """Return all certificates as a list."""
         return [
             self.device_cert,

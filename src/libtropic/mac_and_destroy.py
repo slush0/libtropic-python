@@ -4,7 +4,7 @@ MAC-and-Destroy operations for libtropic.
 Provides secure PIN/password verification with hardware-enforced attempt limits.
 """
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from .enums import MacAndDestroySlot
 from .types import MAC_AND_DESTROY_DATA_SIZE
@@ -72,7 +72,7 @@ class MacAndDestroy:
 
     def execute(
         self,
-        slot: Union[int, MacAndDestroySlot],
+        slot: int | MacAndDestroySlot,
         data: bytes
     ) -> bytes:
         """
@@ -105,7 +105,7 @@ class MacAndDestroy:
 
     def __call__(
         self,
-        slot: Union[int, MacAndDestroySlot],
+        slot: int | MacAndDestroySlot,
         data: bytes
     ) -> bytes:
         """

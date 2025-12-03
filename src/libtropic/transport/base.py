@@ -5,7 +5,7 @@ Defines the contract that all transport implementations must follow.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from types import TracebackType
 
 
 class Transport(ABC):
@@ -133,6 +133,11 @@ class Transport(ABC):
         self.open()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None
+    ) -> None:
         """Context manager exit - closes the transport."""
         self.close()

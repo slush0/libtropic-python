@@ -4,7 +4,7 @@ Configuration operations for libtropic.
 Provides access to TROPIC01's R-Config and I-Config storage.
 """
 
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 from ..enums import ConfigAddress
 from ..types import DeviceConfig

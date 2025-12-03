@@ -4,7 +4,7 @@ Monotonic counter operations for libtropic.
 Provides access to TROPIC01's hardware monotonic counters.
 """
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from .enums import McounterIndex
 from .types import MCOUNTER_VALUE_MAX
@@ -61,7 +61,7 @@ class MonotonicCounters:
 
     def init(
         self,
-        index: Union[int, McounterIndex],
+        index: int | McounterIndex,
         value: int = 0
     ) -> None:
         """
@@ -83,7 +83,7 @@ class MonotonicCounters:
         """
         raise NotImplementedError()
 
-    def update(self, index: Union[int, McounterIndex]) -> None:
+    def update(self, index: int | McounterIndex) -> None:
         """
         Decrement monotonic counter.
 
@@ -103,7 +103,7 @@ class MonotonicCounters:
         """
         raise NotImplementedError()
 
-    def get(self, index: Union[int, McounterIndex]) -> int:
+    def get(self, index: int | McounterIndex) -> int:
         """
         Get current counter value.
 
@@ -129,7 +129,7 @@ class MonotonicCounters:
         """
         return self.get(index)
 
-    def decrement(self, index: Union[int, McounterIndex]) -> int:
+    def decrement(self, index: int | McounterIndex) -> int:
         """
         Decrement counter and return new value.
 

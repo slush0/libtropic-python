@@ -8,7 +8,7 @@ Provides various backends for communicating with TROPIC01:
 
 from .base import Transport
 from .spi import LinuxSpiTransport, SpiConfig
-from .usb_dongle import UsbDongleTransport, UsbDongleConfig
+from .usb_dongle import UsbDongleConfig, UsbDongleTransport
 
 __all__ = [
     "Transport",

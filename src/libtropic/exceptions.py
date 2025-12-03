@@ -4,7 +4,6 @@ Exception hierarchy for libtropic Python bindings.
 Provides Pythonic error handling for TROPIC01 operations.
 """
 
-from typing import Optional
 
 from .enums import ReturnCode
 

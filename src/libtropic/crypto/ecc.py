@@ -4,7 +4,7 @@ ECC key operations for libtropic.
 Provides key generation, storage, reading, and signing operations.
 """
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from ..enums import EccCurve, EccSlot
 from ..types import EccKeyInfo
@@ -50,7 +50,7 @@ class EccKeys:
 
     def generate(
         self,
-        slot: Union[int, EccSlot],
+        slot: int | EccSlot,
         curve: EccCurve
     ) -> None:
         """
@@ -75,7 +75,7 @@ class EccKeys:
 
     def store(
         self,
-        slot: Union[int, EccSlot],
+        slot: int | EccSlot,
         curve: EccCurve,
         private_key: bytes
     ) -> None:
@@ -99,7 +99,7 @@ class EccKeys:
         """
         raise NotImplementedError()
 
-    def read(self, slot: Union[int, EccSlot]) -> EccKeyInfo:
+    def read(self, slot: int | EccSlot) -> EccKeyInfo:
         """
         Read public key and metadata from specified slot.
 
@@ -123,7 +123,7 @@ class EccKeys:
         """
         raise NotImplementedError()
 
-    def erase(self, slot: Union[int, EccSlot]) -> None:
+    def erase(self, slot: int | EccSlot) -> None:
         """
         Erase key from specified slot.
 
@@ -143,7 +143,7 @@ class EccKeys:
 
     def sign_ecdsa(
         self,
-        slot: Union[int, EccSlot],
+        slot: int | EccSlot,
         message: bytes
     ) -> bytes:
         """
@@ -172,7 +172,7 @@ class EccKeys:
 
     def sign_eddsa(
         self,
-        slot: Union[int, EccSlot],
+        slot: int | EccSlot,
         message: bytes
     ) -> bytes:
         """

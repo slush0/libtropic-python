@@ -6,7 +6,7 @@ The dongle uses a serial protocol to translate UART commands to SPI.
 """
 
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Any
 
 from .base import Transport
 

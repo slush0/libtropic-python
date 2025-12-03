@@ -4,7 +4,7 @@ Enumerations for libtropic Python bindings.
 Maps to C SDK enum types from libtropic_common.h and related headers.
 """
 
-from enum import IntEnum, auto
+from enum import IntEnum
 
 
 class ReturnCode(IntEnum):

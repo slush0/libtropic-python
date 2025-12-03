@@ -6,7 +6,7 @@ Suitable for Raspberry Pi, BeagleBone, and other Linux SBCs.
 """
 
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Any
 
 from .base import Transport
 
@@ -27,7 +27,7 @@ class SpiConfig:
     spi_speed_hz: int = 1_000_000
     gpio_chip: str = "/dev/gpiochip0"
     cs_pin: int = 8
-    int_pin: Optional[int] = None
+    int_pin: int | None = None
 
 
 class LinuxSpiTransport(Transport):
