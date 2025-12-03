@@ -124,3 +124,4 @@ class TestHmacSha256Wycheproof:
         else:
             # Invalid vectors - result should NOT match
             assert result != expected_tag
+

@@ -7,7 +7,7 @@ Provides access to TROPIC01's hardware RNG.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..device import Tropic01
+    from .device import Tropic01
 
 
 class RandomGenerator:
@@ -55,9 +55,9 @@ class RandomGenerator:
 
         Maps to: lt_random_value_get()
         """
-        from .._protocol.constants import L3_CMD_RANDOM_VALUE_GET
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_RANDOM_VALUE_GET
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         # Validate count (1-255)
         if count < 1 or count > self.MAX_BYTES:

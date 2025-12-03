@@ -7,7 +7,7 @@ Provides access to TROPIC01's user data partition in R-Memory.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..device import Tropic01
+    from .device import Tropic01
 
 
 class DataMemory:
@@ -35,6 +35,12 @@ class DataMemory:
     SLOT_MIN = 0
     SLOT_MAX = 511
 
+    # Maximum data size per slot (firmware-dependent, see data_size_max property)
+    # - Firmware < 2.0: 444 bytes
+    # - Firmware >= 2.0: 475 bytes
+    DATA_SIZE_MAX_FW_V1 = 444
+    DATA_SIZE_MAX_FW_V2 = 475
+
     def __init__(self, device: 'Tropic01'):
         """
         Initialize data memory module.
@@ -43,9 +49,29 @@ class DataMemory:
             device: Parent Tropic01 device instance
         """
         self._device = device
+        self._data_size_max: int | None = None
 
-    # Maximum data size per slot (depends on FW version, use max)
-    DATA_SIZE_MAX = 475
+    @property
+    def data_size_max(self) -> int:
+        """
+        Maximum data size per slot, determined by firmware version.
+
+        Returns:
+            444 bytes for firmware < 2.0, 475 bytes for firmware >= 2.0
+
+        Maps to: lt_tr01_attrs_t.r_mem_udata_slot_size_max
+        """
+        if self._data_size_max is None:
+            try:
+                fw_ver = self._device.get_riscv_firmware_version()
+                if fw_ver.major < 2:
+                    self._data_size_max = self.DATA_SIZE_MAX_FW_V1
+                else:
+                    self._data_size_max = self.DATA_SIZE_MAX_FW_V2
+            except Exception:
+                # Fall back to max if firmware version unavailable
+                self._data_size_max = self.DATA_SIZE_MAX_FW_V2
+        return self._data_size_max
 
     def write(self, slot: int, data: bytes) -> None:
         """
@@ -56,7 +82,7 @@ class DataMemory:
 
         Args:
             slot: Slot index (0-511)
-            data: Data bytes to store (1-444 bytes)
+            data: Data bytes to store (1-444 bytes for fw<2.0, 1-475 for fw>=2.0)
 
         Raises:
             NoSessionError: If no secure session is active
@@ -68,9 +94,9 @@ class DataMemory:
 
         Maps to: lt_r_mem_data_write()
         """
-        from .._protocol.constants import L3_CMD_R_MEM_DATA_WRITE
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_R_MEM_DATA_WRITE
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         if slot < self.SLOT_MIN or slot > self.SLOT_MAX:
             raise ParamError(
@@ -78,10 +104,10 @@ class DataMemory:
                 f"Slot must be {self.SLOT_MIN}-{self.SLOT_MAX}, got {slot}"
             )
 
-        if len(data) < 1 or len(data) > self.DATA_SIZE_MAX:
+        if len(data) < 1 or len(data) > self.data_size_max:
             raise ParamError(
                 ReturnCode.PARAM_ERR,
-                f"Data must be 1-{self.DATA_SIZE_MAX} bytes, got {len(data)}"
+                f"Data must be 1-{self.data_size_max} bytes, got {len(data)}"
             )
 
         # Build command: slot(2B LE) + padding(1B) + data(variable)
@@ -114,9 +140,9 @@ class DataMemory:
 
         Maps to: lt_r_mem_data_read()
         """
-        from .._protocol.constants import L3_CMD_R_MEM_DATA_READ
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_R_MEM_DATA_READ
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         if slot < self.SLOT_MIN or slot > self.SLOT_MAX:
             raise ParamError(
@@ -137,7 +163,7 @@ class DataMemory:
         # Check if slot is empty (device returns OK but with no data)
         # This matches C library behavior in lt_r_mem_data_read()
         if len(data) == 0:
-            from ..exceptions import SlotEmptyError
+            from .exceptions import SlotEmptyError
             raise SlotEmptyError(
                 ReturnCode.L3_R_MEM_DATA_READ_SLOT_EMPTY,
                 "Slot is empty"
@@ -161,9 +187,9 @@ class DataMemory:
 
         Maps to: lt_r_mem_data_erase()
         """
-        from .._protocol.constants import L3_CMD_R_MEM_DATA_ERASE
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_R_MEM_DATA_ERASE
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         if slot < self.SLOT_MIN or slot > self.SLOT_MAX:
             raise ParamError(

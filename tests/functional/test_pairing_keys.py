@@ -115,3 +115,4 @@ class TestPairingKeysInvalidate:
 
         # This test intentionally does nothing to prevent accidents
         assert current_key is not None
+

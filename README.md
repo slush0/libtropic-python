@@ -160,3 +160,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 - [TROPIC01 Product Page](https://tropicsquare.com/tropic01)
 - [libtropic C SDK](https://github.com/tropicsquare/libtropic)
 - [Tropic Square](https://tropicsquare.com)
+

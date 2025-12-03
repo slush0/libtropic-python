@@ -251,3 +251,4 @@ class TestIConfigWrite:
 
         # This test intentionally does nothing to prevent accidents
         assert current_config is not None  # Just verify we can read
+

@@ -179,3 +179,4 @@ class TestMcounter:
             assert value == 1000 + index, (
                 f"Counter {index} changed unexpectedly to {value}"
             )
+

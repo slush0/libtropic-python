@@ -80,3 +80,4 @@ class TestRandomValueGet:
         """Test that requesting > 255 bytes raises ParamError."""
         with pytest.raises(ParamError):
             device_with_session.random.get_bytes(256)
+

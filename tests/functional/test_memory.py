@@ -173,3 +173,4 @@ class TestRMemData:
 
         read_data = device_with_session.memory.read(slot)
         assert read_data == write_data
+

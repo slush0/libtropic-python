@@ -166,3 +166,4 @@ class TestX25519Wycheproof:
             assert result == expected_shared
         # For invalid vectors, we just check it doesn't crash
         # The output may or may not match depending on implementation
+

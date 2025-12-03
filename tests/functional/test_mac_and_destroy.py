@@ -266,3 +266,4 @@ class TestMacAndDestroy:
         response2 = device_with_session.mac_and_destroy.execute(slot=slot, data=challenge2)
 
         assert response1 != response2, "Different inputs should produce different outputs"
+

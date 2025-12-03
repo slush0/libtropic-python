@@ -247,3 +247,4 @@ class TestEddsaSign:
         assert all(s == signatures[0] for s in signatures), (
             "EdDSA signatures should be deterministic"
         )
+

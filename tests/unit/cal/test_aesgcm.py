@@ -197,3 +197,4 @@ class TestAesGcmWycheproof:
                 # Invalid vector - should raise error
                 with pytest.raises(Exception):  # CryptoError when implemented
                     ctx.decrypt(iv, ciphertext + tag, aad if aad else None)
+

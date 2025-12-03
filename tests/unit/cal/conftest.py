@@ -200,3 +200,4 @@ SHA256_NIST_VECTORS = [
 def sha256_vectors() -> list[tuple[bytes, str]]:
     """Fixture providing SHA256 NIST test vectors."""
     return SHA256_NIST_VECTORS.copy()
+

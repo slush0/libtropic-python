@@ -259,3 +259,4 @@ class TestEccKeyStore:
                 curve=EccCurve.ED25519,
                 private_key=private_key
             )
+

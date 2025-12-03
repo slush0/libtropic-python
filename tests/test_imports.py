@@ -105,3 +105,4 @@ def test_device_submodules():
     assert device.mac_and_destroy is not None
     assert device.pairing_keys is not None
     assert device.firmware is not None
+

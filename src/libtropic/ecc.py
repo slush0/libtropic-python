@@ -6,11 +6,11 @@ Provides key generation, storage, reading, and signing operations.
 
 from typing import TYPE_CHECKING
 
-from ..enums import EccCurve, EccSlot
-from ..types import EccKeyInfo
+from .enums import EccCurve, EccSlot
+from .types import EccKeyInfo
 
 if TYPE_CHECKING:
-    from ..device import Tropic01
+    from .device import Tropic01
 
 
 class EccKeys:
@@ -71,9 +71,9 @@ class EccKeys:
 
         Maps to: lt_ecc_key_generate()
         """
-        from .._protocol.constants import L3_CMD_ECC_KEY_GENERATE
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_ECC_KEY_GENERATE
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         slot_idx = int(slot)
         if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:
@@ -118,9 +118,9 @@ class EccKeys:
 
         Maps to: lt_ecc_key_store()
         """
-        from .._protocol.constants import L3_CMD_ECC_KEY_STORE
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_ECC_KEY_STORE
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         slot_idx = int(slot)
         if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:
@@ -174,9 +174,9 @@ class EccKeys:
 
         Maps to: lt_ecc_key_read()
         """
-        from .._protocol.constants import L3_CMD_ECC_KEY_READ
-        from ..enums import ReturnCode, EccKeyOrigin
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_ECC_KEY_READ
+        from .enums import ReturnCode, EccKeyOrigin
+        from .exceptions import ParamError
 
         slot_idx = int(slot)
         if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:
@@ -240,9 +240,9 @@ class EccKeys:
 
         Maps to: lt_ecc_key_erase()
         """
-        from .._protocol.constants import L3_CMD_ECC_KEY_ERASE
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_ECC_KEY_ERASE
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         slot_idx = int(slot)
         if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:
@@ -287,9 +287,9 @@ class EccKeys:
 
         Maps to: lt_ecc_ecdsa_sign()
         """
-        from .._protocol.constants import L3_CMD_ECDSA_SIGN
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_ECDSA_SIGN
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         slot_idx = int(slot)
         if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:
@@ -351,9 +351,9 @@ class EccKeys:
 
         Maps to: lt_ecc_eddsa_sign()
         """
-        from .._protocol.constants import L3_CMD_EDDSA_SIGN
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_EDDSA_SIGN
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         slot_idx = int(slot)
         if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:

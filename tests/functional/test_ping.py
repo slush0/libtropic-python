@@ -86,3 +86,4 @@ class TestPing:
         ping_data_out = bytes([0xFF] * 256)
         ping_data_in = device_with_session.ping(ping_data_out)
         assert ping_data_in == ping_data_out
+

@@ -6,11 +6,11 @@ Provides access to TROPIC01's R-Config and I-Config storage.
 
 from typing import TYPE_CHECKING
 
-from ..enums import ConfigAddress
-from ..types import DeviceConfig
+from .enums import ConfigAddress
+from .types import DeviceConfig
 
 if TYPE_CHECKING:
-    from ..device import Tropic01
+    from .device import Tropic01
 
 
 class Configuration:
@@ -74,7 +74,7 @@ class Configuration:
 
         Maps to: lt_r_config_read()
         """
-        from .._protocol.constants import L3_CMD_R_CONFIG_READ
+        from ._protocol.constants import L3_CMD_R_CONFIG_READ
 
         addr = int(address)
 
@@ -108,7 +108,7 @@ class Configuration:
 
         Maps to: lt_r_config_write()
         """
-        from .._protocol.constants import L3_CMD_R_CONFIG_WRITE
+        from ._protocol.constants import L3_CMD_R_CONFIG_WRITE
 
         addr = int(address)
 
@@ -137,7 +137,7 @@ class Configuration:
 
         Maps to: lt_r_config_erase()
         """
-        from .._protocol.constants import L3_CMD_R_CONFIG_ERASE
+        from ._protocol.constants import L3_CMD_R_CONFIG_ERASE
 
         # Send command - no data, response is empty (just result code)
         self._device._send_l3_command(L3_CMD_R_CONFIG_ERASE, b"")
@@ -201,7 +201,7 @@ class Configuration:
 
         Maps to: lt_i_config_read()
         """
-        from .._protocol.constants import L3_CMD_I_CONFIG_READ
+        from ._protocol.constants import L3_CMD_I_CONFIG_READ
 
         addr = int(address)
 
@@ -242,9 +242,9 @@ class Configuration:
 
         Maps to: lt_i_config_write()
         """
-        from .._protocol.constants import L3_CMD_I_CONFIG_WRITE
-        from ..enums import ReturnCode
-        from ..exceptions import ParamError
+        from ._protocol.constants import L3_CMD_I_CONFIG_WRITE
+        from .enums import ReturnCode
+        from .exceptions import ParamError
 
         if bit_index < 0 or bit_index > 31:
             raise ParamError(

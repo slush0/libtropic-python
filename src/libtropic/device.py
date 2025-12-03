@@ -12,8 +12,8 @@ from types import TracebackType
 from typing import Optional
 
 from .counters import MonotonicCounters
-from .crypto.ecc import EccKeys
-from .crypto.random import RandomGenerator
+from .ecc import EccKeys
+from .random import RandomGenerator
 from .enums import (
     DeviceMode,
     FirmwareBank,
@@ -33,8 +33,8 @@ from .exceptions import (
 from .firmware import FirmwareUpdater
 from .mac_and_destroy import MacAndDestroy
 from .pairing_keys import PairingKeys
-from .storage.config import Configuration
-from .storage.memory import DataMemory
+from .config import Configuration
+from .memory import DataMemory
 from .transport.base import Transport
 from .transport.usb_dongle import UsbDongleConfig, UsbDongleTransport
 from .types import (
