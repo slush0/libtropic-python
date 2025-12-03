@@ -5,19 +5,34 @@ These fixtures provide common setup for tests that mirror the C functional tests
 from libtropic-upstream/tests/functional/.
 
 Test Requirements:
-    - Tests require actual TROPIC01 hardware connected via USB dongle
+    - Tests require actual TROPIC01 hardware connected via USB dongle or SPI
     - Tests marked with @pytest.mark.destructive modify device state
     - Tests marked with @pytest.mark.irreversible permanently modify device
     - Run destructive tests with: pytest -m destructive
     - Skip destructive tests with: pytest -m "not destructive"
 
 Environment Variables:
-    - LIBTROPIC_DEVICE: Device path (default: /dev/ttyACM0)
-    - LIBTROPIC_KEY_CONFIG: Key configuration to use:
-        - "engineering" (default): Engineering sample keys at slot 0
-        - "hwwallet": Hardware wallet example keys at slot 1
-    - LIBTROPIC_RUN_DESTRUCTIVE: Set to "1" to run destructive tests
-    - LIBTROPIC_RUN_IRREVERSIBLE: Set to "1" to run irreversible tests
+    Transport selection:
+        - LIBTROPIC_TRANSPORT: Transport type ("usb" or "spi", default: "usb")
+
+    USB dongle settings (when LIBTROPIC_TRANSPORT=usb):
+        - LIBTROPIC_DEVICE: Device path (default: /dev/ttyACM0)
+
+    SPI settings (when LIBTROPIC_TRANSPORT=spi):
+        - LIBTROPIC_SPI_DEVICE: SPI device path (default: /dev/spidev0.0)
+        - LIBTROPIC_SPI_SPEED_HZ: SPI clock speed in Hz (default: 1000000)
+        - LIBTROPIC_GPIO_CHIP: GPIO chip device (default: /dev/gpiochip0)
+        - LIBTROPIC_CS_PIN: GPIO pin for chip select (default: 8)
+        - LIBTROPIC_INT_PIN: GPIO pin for interrupt (optional, no default)
+
+    Key configuration:
+        - LIBTROPIC_KEY_CONFIG: Key configuration to use:
+            - "engineering" (default): Engineering sample keys at slot 0
+            - "hwwallet": Hardware wallet example keys at slot 1
+
+    Test control:
+        - LIBTROPIC_RUN_DESTRUCTIVE: Set to "1" to run destructive tests
+        - LIBTROPIC_RUN_IRREVERSIBLE: Set to "1" to run irreversible tests
 """
 
 import os
@@ -31,10 +46,15 @@ from libtropic import (
     EccCurve,
     EccSlot,
     InvalidKeyError,
+    LinuxSpiTransport,
     MacAndDestroySlot,
     PairingKeySlot,
     SlotEmptyError,
+    SpiConfig,
+    Transport,
     Tropic01,
+    UsbDongleConfig,
+    UsbDongleTransport,
 )
 
 
@@ -42,8 +62,59 @@ from libtropic import (
 # Test Configuration
 # =============================================================================
 
-# Default test device path
-DEFAULT_DEVICE = "/dev/ttyACM0"
+# Transport type: "usb" or "spi"
+TRANSPORT_TYPE = os.environ.get("LIBTROPIC_TRANSPORT", "usb").lower()
+
+# USB dongle settings
+DEFAULT_USB_DEVICE = "/dev/ttyACM0"
+
+# SPI default settings
+DEFAULT_SPI_DEVICE = "/dev/spidev0.0"
+DEFAULT_SPI_SPEED_HZ = 1_000_000
+DEFAULT_GPIO_CHIP = "/dev/gpiochip0"
+DEFAULT_CS_PIN = 8
+
+
+def create_transport() -> Transport:
+    """
+    Create transport based on environment configuration.
+
+    Returns:
+        Transport instance (USB dongle or Linux SPI) based on LIBTROPIC_TRANSPORT.
+
+    Raises:
+        ValueError: If LIBTROPIC_TRANSPORT has invalid value.
+    """
+    if TRANSPORT_TYPE == "spi":
+        # Parse SPI configuration from environment
+        spi_device = os.environ.get("LIBTROPIC_SPI_DEVICE", DEFAULT_SPI_DEVICE)
+        spi_speed_hz = int(os.environ.get("LIBTROPIC_SPI_SPEED_HZ", DEFAULT_SPI_SPEED_HZ))
+        gpio_chip = os.environ.get("LIBTROPIC_GPIO_CHIP", DEFAULT_GPIO_CHIP)
+        cs_pin = int(os.environ.get("LIBTROPIC_CS_PIN", DEFAULT_CS_PIN))
+
+        # INT pin is optional
+        int_pin_str = os.environ.get("LIBTROPIC_INT_PIN")
+        int_pin = int(int_pin_str) if int_pin_str else None
+
+        config = SpiConfig(
+            spi_device=spi_device,
+            spi_speed_hz=spi_speed_hz,
+            gpio_chip=gpio_chip,
+            cs_pin=cs_pin,
+            int_pin=int_pin,
+        )
+        return LinuxSpiTransport(config)
+
+    elif TRANSPORT_TYPE == "usb":
+        device_path = os.environ.get("LIBTROPIC_DEVICE", DEFAULT_USB_DEVICE)
+        config = UsbDongleConfig(device_path=device_path)
+        return UsbDongleTransport(config)
+
+    else:
+        raise ValueError(
+            f"Invalid LIBTROPIC_TRANSPORT='{TRANSPORT_TYPE}'. "
+            f"Valid options: 'usb', 'spi'"
+        )
 
 
 @dataclass
@@ -166,12 +237,6 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 # =============================================================================
 
 @pytest.fixture
-def device_path() -> str:
-    """Get device path from environment or use default."""
-    return os.environ.get("LIBTROPIC_DEVICE", DEFAULT_DEVICE)
-
-
-@pytest.fixture
 def key_config() -> KeyConfig:
     """
     Get active key configuration based on LIBTROPIC_KEY_CONFIG env var.
@@ -186,13 +251,15 @@ def key_config() -> KeyConfig:
 
 
 @pytest.fixture
-def device(device_path: str) -> Generator[Tropic01, None, None]:
+def device() -> Generator[Tropic01, None, None]:
     """
     Provide initialized Tropic01 device (no session).
 
+    Transport is selected via LIBTROPIC_TRANSPORT env var ("usb" or "spi").
     Use for tests that only need device-level operations.
     """
-    dev = Tropic01(device_path)
+    transport = create_transport()
+    dev = Tropic01(transport)
     dev.open()
     try:
         yield dev
@@ -201,9 +268,11 @@ def device(device_path: str) -> Generator[Tropic01, None, None]:
 
 
 @pytest.fixture
-def device_with_session(device_path: str, key_config: KeyConfig) -> Generator[Tropic01, None, None]:
+def device_with_session(key_config: KeyConfig) -> Generator[Tropic01, None, None]:
     """
     Provide Tropic01 device with active secure session.
+
+    Transport is selected via LIBTROPIC_TRANSPORT env var ("usb" or "spi").
 
     Uses keys configured via LIBTROPIC_KEY_CONFIG environment variable:
         - "engineering": Engineering sample keys at slot 0 (default)
@@ -211,7 +280,8 @@ def device_with_session(device_path: str, key_config: KeyConfig) -> Generator[Tr
 
     Use for tests that require L3 (session-protected) operations.
     """
-    dev = Tropic01(device_path)
+    transport = create_transport()
+    dev = Tropic01(transport)
     dev.open()
     dev.verify_chip_and_start_session(
         private_key=key_config.private_key,
