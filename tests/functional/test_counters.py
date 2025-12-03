@@ -12,7 +12,6 @@ from libtropic import CounterInvalidError, McounterIndex, Tropic01
 
 from ..conftest import MCOUNTER_MAX, MCOUNTER_MIN
 
-
 # Maximum counter value
 MCOUNTER_VALUE_MAX = 0xFFFFFFFE
 

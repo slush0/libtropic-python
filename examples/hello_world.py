@@ -22,8 +22,8 @@ import logging
 import sys
 
 from libtropic import Tropic01
-from libtropic.keys import SH0_PRIV_PROD, SH0_PUB_PROD
 from libtropic.enums import PairingKeySlot
+from libtropic.keys import SH0_PRIV_PROD, SH0_PUB_PROD
 
 # Configure logging
 logging.basicConfig(

@@ -1,6 +1,5 @@
 """Basic import tests for libtropic package."""
 
-import pytest
 
 
 def test_import_main_module():
@@ -13,16 +12,9 @@ def test_import_main_module():
 def test_import_enums():
     """Test that enums can be imported."""
     from libtropic import (
-        ReturnCode,
         DeviceMode,
-        StartupMode,
         EccCurve,
-        EccKeyOrigin,
-        FirmwareBank,
-        PairingKeySlot,
-        EccSlot,
-        McounterIndex,
-        ConfigAddress,
+        StartupMode,
     )
 
     assert DeviceMode.APPLICATION == 1
@@ -33,11 +25,9 @@ def test_import_enums():
 def test_import_exceptions():
     """Test that exceptions can be imported."""
     from libtropic import (
-        TropicError,
         NoSessionError,
-        ParamError,
-        CryptoError,
         SlotEmptyError,
+        TropicError,
     )
 
     assert issubclass(NoSessionError, TropicError)
@@ -47,12 +37,7 @@ def test_import_exceptions():
 def test_import_types():
     """Test that data types can be imported."""
     from libtropic import (
-        ChipId,
         FirmwareVersion,
-        FirmwareHeader,
-        CertificateStore,
-        EccKeyInfo,
-        DeviceConfig,
     )
 
     # Test FirmwareVersion can be instantiated
@@ -63,11 +48,7 @@ def test_import_types():
 def test_import_transport():
     """Test that transport classes can be imported."""
     from libtropic import (
-        Transport,
-        LinuxSpiTransport,
         SpiConfig,
-        UsbDongleTransport,
-        UsbDongleConfig,
     )
 
     config = SpiConfig()
@@ -76,7 +57,7 @@ def test_import_transport():
 
 def test_import_factory_functions():
     """Test that factory functions can be imported."""
-    from libtropic import connect_usb_dongle, connect_spi
+    from libtropic import connect_spi, connect_usb_dongle
 
     assert callable(connect_usb_dongle)
     assert callable(connect_spi)

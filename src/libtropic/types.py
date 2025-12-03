@@ -113,7 +113,8 @@ class ChipId:
             f"  Programmer ver       = 0x{self.programmer_version.hex()}\n"
             f"  S/N                  = 0x{self.serial_number.hex()}\n"
             f"  P/N (long)           = {self.part_number}\n"
-            f"  Prov template ver    = v{self.prov_template_version[0]}.{self.prov_template_version[1]}\n"
+            f"  Prov template ver    = "
+            f"v{self.prov_template_version[0]}.{self.prov_template_version[1]}\n"
             f"  Prov template tag    = 0x{self.prov_template_tag.hex()}\n"
             f"  Prov spec ver        = v{self.prov_spec_version[0]}.{self.prov_spec_version[1]}\n"
             f"  Prov spec tag        = 0x{self.prov_spec_tag.hex()}\n"
@@ -173,7 +174,7 @@ class FirmwareHeader:
             ver_str += f".{ver_build}"
 
         lines = [
-            f"FirmwareHeader:",
+            "FirmwareHeader:",
             f"  FW type              = {self.fw_type} ({type_str})",
             f"  FW header version    = 0x{self.header_version:02X}",
             f"  FW version           = 0x{self.version:08X} ({ver_str})",
@@ -306,8 +307,12 @@ class DeviceConfig:
             sleep_mode=config_dict.get(ConfigAddress.SLEEP_MODE, 0xFFFFFFFF),
             uap_pairing_key_write=config_dict.get(ConfigAddress.UAP_PAIRING_KEY_WRITE, 0xFFFFFFFF),
             uap_pairing_key_read=config_dict.get(ConfigAddress.UAP_PAIRING_KEY_READ, 0xFFFFFFFF),
-            uap_pairing_key_invalidate=config_dict.get(ConfigAddress.UAP_PAIRING_KEY_INVALIDATE, 0xFFFFFFFF),
-            uap_r_config_write_erase=config_dict.get(ConfigAddress.UAP_R_CONFIG_WRITE_ERASE, 0xFFFFFFFF),
+            uap_pairing_key_invalidate=config_dict.get(
+                ConfigAddress.UAP_PAIRING_KEY_INVALIDATE, 0xFFFFFFFF
+            ),
+            uap_r_config_write_erase=config_dict.get(
+                ConfigAddress.UAP_R_CONFIG_WRITE_ERASE, 0xFFFFFFFF
+            ),
             uap_r_config_read=config_dict.get(ConfigAddress.UAP_R_CONFIG_READ, 0xFFFFFFFF),
             uap_i_config_write=config_dict.get(ConfigAddress.UAP_I_CONFIG_WRITE, 0xFFFFFFFF),
             uap_i_config_read=config_dict.get(ConfigAddress.UAP_I_CONFIG_READ, 0xFFFFFFFF),

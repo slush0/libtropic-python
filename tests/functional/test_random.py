@@ -10,7 +10,6 @@ import pytest
 
 from libtropic import ParamError, Tropic01
 
-
 # Maximum bytes per request
 RANDOM_VALUE_MAX_LEN = 255
 

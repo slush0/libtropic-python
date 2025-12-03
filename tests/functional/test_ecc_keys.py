@@ -21,7 +21,6 @@ from libtropic.types import EccKeyInfo
 
 from ..conftest import ECC_SLOT_MAX, ECC_SLOT_MIN, generate_test_data
 
-
 # Key sizes
 P256_PUBKEY_LEN = 64  # Uncompressed P256 public key
 ED25519_PUBKEY_LEN = 32  # Ed25519 public key

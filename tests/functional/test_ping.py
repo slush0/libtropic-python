@@ -17,7 +17,6 @@ from ..conftest import (
     generate_test_data,
 )
 
-
 # Number of ping iterations (matches C test)
 PING_MAX_LOOPS = 200
 

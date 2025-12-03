@@ -14,7 +14,7 @@ Protocol details:
 import os
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from .base import Transport
 
@@ -79,7 +79,7 @@ class UsbDongleTransport(Transport):
             config: USB dongle configuration parameters
         """
         self.config = config
-        self._serial: "Serial | None" = None
+        self._serial: Serial | None = None
 
     def open(self) -> None:
         """
@@ -155,7 +155,7 @@ class UsbDongleTransport(Transport):
         # Write to dongle
         written = self._serial.write(hex_data)
         if written != len(hex_data):
-            raise IOError(f"Failed to write all data: {written}/{len(hex_data)}")
+            raise OSError(f"Failed to write all data: {written}/{len(hex_data)}")
 
         # Small delay before reading (per C implementation)
         time.sleep(_USB_DONGLE_READ_WRITE_DELAY_MS / 1000.0)
@@ -166,7 +166,7 @@ class UsbDongleTransport(Transport):
         response = self._read_exact(expected_len)
 
         if len(response) != expected_len:
-            raise IOError(
+            raise OSError(
                 f"Incomplete response: got {len(response)}, expected {expected_len}"
             )
 
@@ -175,7 +175,7 @@ class UsbDongleTransport(Transport):
         try:
             return bytes.fromhex(hex_response.decode("ascii"))
         except ValueError as e:
-            raise IOError(f"Invalid hex response: {hex_response!r}") from e
+            raise OSError(f"Invalid hex response: {hex_response!r}") from e
 
     def cs_low(self) -> None:
         """
@@ -202,7 +202,7 @@ class UsbDongleTransport(Transport):
         # Read confirmation response: "OK\r\n"
         response = self._read_exact(4)
         if response != b"OK\r\n":
-            raise IOError(f"Unexpected CS release response: {response!r}")
+            raise OSError(f"Unexpected CS release response: {response!r}")
 
     def delay_ms(self, ms: int) -> None:
         """

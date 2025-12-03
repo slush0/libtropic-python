@@ -37,9 +37,9 @@ import sys
 from dataclasses import dataclass
 
 from libtropic import Tropic01
-from libtropic.keys import SH0_PRIV_PROD, SH0_PUB_PROD
+from libtropic._cal.hmac_sha256 import HASH_LENGTH, hmac_sha256
 from libtropic.enums import PairingKeySlot
-from libtropic._cal.hmac_sha256 import hmac_sha256, HASH_LENGTH
+from libtropic.keys import SH0_PRIV_PROD, SH0_PUB_PROD
 
 # Configure logging
 logging.basicConfig(
@@ -124,7 +124,7 @@ def encrypt(data: bytes, key: bytes) -> bytes:
     NOTE: This is a placeholder - replace with proper encryption (e.g., AES-GCM)
     in production code.
     """
-    return bytes(d ^ k for d, k in zip(data, key))
+    return bytes(d ^ k for d, k in zip(data, key, strict=True))
 
 
 def decrypt(data: bytes, key: bytes) -> bytes:
@@ -133,7 +133,7 @@ def decrypt(data: bytes, key: bytes) -> bytes:
 
     NOTE: This is a placeholder - replace with proper decryption in production.
     """
-    return bytes(d ^ k for d, k in zip(data, key))
+    return bytes(d ^ k for d, k in zip(data, key, strict=True))
 
 
 # =============================================================================
@@ -322,7 +322,10 @@ def pin_entry_check(
     current_slot = nvm.i  # Use the slot that was just "consumed"
 
     # Persist decremented counter immediately
-    log.info("Writing back M&D data into R_Mem User slot %d (decrement counter)...", R_MEM_DATA_SLOT_MACANDD)
+    log.info(
+        "Writing back M&D data into R_Mem User slot %d (decrement counter)...",
+        R_MEM_DATA_SLOT_MACANDD,
+    )
     device.memory.erase(R_MEM_DATA_SLOT_MACANDD)
     device.memory.write(R_MEM_DATA_SLOT_MACANDD, nvm.to_bytes())
     log.info("    OK")
@@ -403,15 +406,9 @@ def main() -> int:
     log.info("==== TROPIC01 Mac and Destroy Example ====")
     log.info("=" * 46)
 
-    # Example PIN and additional data
+    # Example PIN (additional_data can be used for hardware ID binding)
     correct_pin = bytes([1, 2, 3, 4])
     wrong_pin = bytes([2, 2, 3, 4])
-    additional_data = bytes([
-        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-        0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-    ])
 
     try:
         with Tropic01(args.port) as device:

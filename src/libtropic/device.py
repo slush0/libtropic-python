@@ -4,16 +4,52 @@ Main TROPIC01 device interface for libtropic.
 Provides the primary entry point for communicating with TROPIC01 secure elements.
 """
 
-import os
 import secrets
 from dataclasses import dataclass
 from pathlib import Path
 from types import TracebackType
-from typing import Optional
 
+from ._cal import (
+    AesGcmDecryptContext,
+    Sha256Context,
+    hkdf,
+    secure_memzero,
+    x25519,
+    x25519_scalarmult_base,
+)
+from ._protocol import (
+    AESGCM_IV_SIZE,
+    HANDSHAKE_RSP_ET_PUB_SIZE,
+    HANDSHAKE_RSP_T_AUTH_SIZE,
+    L1_CHIP_MODE_ALARM,
+    L1_CHIP_MODE_READY,
+    L1_CHIP_MODE_STARTUP,
+    L2_ENCRYPTED_CMD_REQ_ID,
+    L2_GET_INFO_OBJECT_ID_CHIP_ID,
+    L2_GET_INFO_OBJECT_ID_FW_BANK,
+    L2_GET_INFO_OBJECT_ID_RISCV_FW_VER,
+    L2_GET_INFO_OBJECT_ID_SPECT_FW_VER,
+    L2_GET_INFO_REQ_ID,
+    L2_GET_LOG_REQ_ID,
+    L2_HANDSHAKE_REQ_ID,
+    L2_HANDSHAKE_RSP_LEN,
+    L2_SLEEP_REQ_ID,
+    L2_STARTUP_REQ_ID,
+    REBOOT_DELAY_MS,
+    SLEEP_KIND_SLEEP,
+    STARTUP_ID_MAINTENANCE,
+    STARTUP_ID_REBOOT,
+    X25519_KEY_LEN,
+    L2Layer,
+    L3ResultError,
+    decrypt_response,
+    encrypt_command,
+    result_code_to_exception,
+)
+from ._protocol.l1 import L1ChipAlarmError
+from .config import Configuration
 from .counters import MonotonicCounters
 from .ecc import EccKeys
-from .random import RandomGenerator
 from .enums import (
     DeviceMode,
     FirmwareBank,
@@ -23,7 +59,6 @@ from .enums import (
 )
 from .exceptions import (
     AuthenticationError,
-    DeviceAlarmError,
     HandshakeError,
     NoSessionError,
     ParamError,
@@ -32,9 +67,9 @@ from .exceptions import (
 )
 from .firmware import FirmwareUpdater
 from .mac_and_destroy import MacAndDestroy
-from .pairing_keys import PairingKeys
-from .config import Configuration
 from .memory import DataMemory
+from .pairing_keys import PairingKeys
+from .random import RandomGenerator
 from .transport.base import Transport
 from .transport.usb_dongle import UsbDongleConfig, UsbDongleTransport
 from .types import (
@@ -42,45 +77,6 @@ from .types import (
     ChipId,
     FirmwareHeader,
     FirmwareVersion,
-)
-from ._protocol import (
-    L2Layer,
-    L1_CHIP_MODE_READY,
-    L1_CHIP_MODE_ALARM,
-    L1_CHIP_MODE_STARTUP,
-    L2_GET_INFO_REQ_ID,
-    L2_HANDSHAKE_REQ_ID,
-    L2_ENCRYPTED_CMD_REQ_ID,
-    L2_STARTUP_REQ_ID,
-    L2_SLEEP_REQ_ID,
-    L2_GET_LOG_REQ_ID,
-    L2_GET_INFO_OBJECT_ID_CHIP_ID,
-    L2_GET_INFO_OBJECT_ID_RISCV_FW_VER,
-    L2_GET_INFO_OBJECT_ID_SPECT_FW_VER,
-    L2_GET_INFO_OBJECT_ID_FW_BANK,
-    L2_HANDSHAKE_RSP_LEN,
-    HANDSHAKE_RSP_ET_PUB_SIZE,
-    HANDSHAKE_RSP_T_AUTH_SIZE,
-    STARTUP_ID_REBOOT,
-    STARTUP_ID_MAINTENANCE,
-    SLEEP_KIND_SLEEP,
-    REBOOT_DELAY_MS,
-    X25519_KEY_LEN,
-    AESGCM_IV_SIZE,
-    encrypt_command,
-    decrypt_response,
-    result_code_to_exception,
-    L3ResultError,
-)
-from ._protocol.l1 import L1ChipAlarm
-from ._cal import (
-    x25519,
-    x25519_scalarmult_base,
-    hkdf,
-    sha256,
-    Sha256Context,
-    AesGcmDecryptContext,
-    secure_memzero,
 )
 
 
@@ -350,11 +346,11 @@ class Tropic01:
             L3ResultError: If command returns error result
             Various TropicError subclasses: Mapped from L3 result codes
         """
-        from ._protocol.l2 import L2FrameStatus
         from ._protocol.constants import L2_CHUNK_MAX_DATA_SIZE
+        from ._protocol.l2 import L2FrameStatus
 
         session = self._ensure_session()
-        l2 = self._l2
+        l2 = self._ensure_open()
 
         # Encrypt command
         encrypted_cmd = encrypt_command(session, cmd_id, data)
@@ -448,7 +444,7 @@ class Tropic01:
 
         try:
             chip_status = l2.l1.get_chip_status()
-        except L1ChipAlarm:
+        except L1ChipAlarmError:
             return DeviceMode.ALARM
 
         # Check ALARM bit first (highest priority)
@@ -539,7 +535,9 @@ class Tropic01:
         data = self._get_info(L2_GET_INFO_OBJECT_ID_RISCV_FW_VER)
 
         if len(data) < 4:
-            raise TropicError(ReturnCode.FAIL, f"RISC-V FW version data too short: {len(data)} bytes")
+            raise TropicError(
+                ReturnCode.FAIL, f"RISC-V FW version data too short: {len(data)} bytes"
+            )
 
         # Version bytes: [build, patch, minor, major|flag]
         # Note: If in startup mode, highest bit of major (data[3]) is set
@@ -562,7 +560,9 @@ class Tropic01:
         data = self._get_info(L2_GET_INFO_OBJECT_ID_SPECT_FW_VER)
 
         if len(data) < 4:
-            raise TropicError(ReturnCode.FAIL, f"SPECT FW version data too short: {len(data)} bytes")
+            raise TropicError(
+                ReturnCode.FAIL, f"SPECT FW version data too short: {len(data)} bytes"
+            )
 
         # Version bytes: [build, patch, minor, major|flag]
         # Note: If in startup mode, this returns a dummy value with high bit set
@@ -641,17 +641,16 @@ class Tropic01:
         Maps to: lt_get_info_cert_store()
         """
         from ._protocol.constants import (
-            L2_GET_INFO_OBJECT_ID_X509_CERT,
             GET_INFO_CERT_CHUNK_SIZE,
+            L2_GET_INFO_OBJECT_ID_X509_CERT,
         )
 
         l2 = self._ensure_open()
 
         # Certificate store constants
-        CERT_STORE_VERSION = 0x01
-        NUM_CERTIFICATES = 4
-        HEADER_SIZE = 2 + (NUM_CERTIFICATES * 2)  # version + num_certs + 4x length
-        MAX_CERT_SIZE = 1024  # Maximum size for a single certificate
+        cert_store_version = 0x01
+        num_certificates = 4
+        header_size = 2 + (num_certificates * 2)  # version + num_certs + 4x length
 
         # Read first block to get header
         response = l2.send_receive(
@@ -668,14 +667,14 @@ class Tropic01:
         # Parse header
         data = response.data
         version = data[0]
-        if version != CERT_STORE_VERSION:
+        if version != cert_store_version:
             raise TropicError(
                 ReturnCode.CERT_STORE_INVALID,
                 f"Invalid certificate store version: {version}"
             )
 
         num_certs = data[1]
-        if num_certs != NUM_CERTIFICATES:
+        if num_certs != num_certificates:
             raise TropicError(
                 ReturnCode.CERT_STORE_INVALID,
                 f"Unexpected certificate count: {num_certs}"
@@ -683,14 +682,14 @@ class Tropic01:
 
         # Extract certificate lengths (big-endian)
         cert_lengths = []
-        for i in range(NUM_CERTIFICATES):
+        for i in range(num_certificates):
             offset = 2 + (i * 2)
             cert_len = (data[offset] << 8) | data[offset + 1]
             cert_lengths.append(cert_len)
 
         # Calculate total size needed and blocks to read
         total_cert_size = sum(cert_lengths)
-        total_size = HEADER_SIZE + total_cert_size
+        total_size = header_size + total_cert_size
         num_blocks = (total_size + GET_INFO_CERT_CHUNK_SIZE - 1) // GET_INFO_CERT_CHUNK_SIZE
 
         # Collect all blocks
@@ -703,9 +702,9 @@ class Tropic01:
             all_data.extend(response.data)
 
         # Extract certificates
-        cert_offset = HEADER_SIZE
+        cert_offset = header_size
         certs = []
-        for i, cert_len in enumerate(cert_lengths):
+        for _, cert_len in enumerate(cert_lengths):
             cert_data = bytes(all_data[cert_offset:cert_offset + cert_len])
             certs.append(cert_data)
             cert_offset += cert_len
@@ -736,10 +735,10 @@ class Tropic01:
 
         # X25519 OID: 1.3.101.110 encoded as 2B 65 6E
         # In ASN.1 DER: 06 03 2B 65 6E (tag=06, length=03, data=2B656E)
-        X25519_OID = bytes([0x06, 0x03, 0x2B, 0x65, 0x6E])
+        x25519_oid = bytes([0x06, 0x03, 0x2B, 0x65, 0x6E])
 
         # Search for the OID in the certificate
-        oid_pos = cert_data.find(X25519_OID)
+        oid_pos = cert_data.find(x25519_oid)
         if oid_pos == -1:
             raise TropicError(
                 ReturnCode.CERT_ITEM_NOT_FOUND,
@@ -749,7 +748,7 @@ class Tropic01:
         # After the OID, we expect BIT STRING containing the public key
         # BIT STRING format: 03 <length> 00 <key_bytes>
         # The 00 byte is the "unused bits" indicator
-        pos = oid_pos + len(X25519_OID)
+        pos = oid_pos + len(x25519_oid)
 
         # Skip to the BIT STRING (may be in next sequence level)
         # Look for tag 0x03 (BIT STRING)

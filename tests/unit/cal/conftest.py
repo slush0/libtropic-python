@@ -5,11 +5,11 @@ Provides Wycheproof test vector loading and common test utilities.
 """
 
 import json
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
-
 
 # Path to Wycheproof test vectors
 WYCHEPROOF_DIR = Path(__file__).parent.parent.parent / "wycheproof"

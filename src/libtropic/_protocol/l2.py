@@ -10,25 +10,24 @@ from enum import IntEnum
 from typing import TYPE_CHECKING
 
 from .constants import (
-    L2_STATUS_REQUEST_OK,
-    L2_STATUS_RESULT_OK,
-    L2_STATUS_REQUEST_CONT,
-    L2_STATUS_RESULT_CONT,
-    L2_STATUS_RESP_DISABLED,
-    L2_STATUS_HSK_ERR,
-    L2_STATUS_NO_SESSION,
-    L2_STATUS_TAG_ERR,
-    L2_STATUS_CRC_ERR,
-    L2_STATUS_UNKNOWN_ERR,
-    L2_STATUS_GEN_ERR,
-    L2_STATUS_NO_RESP,
-    L2_RESEND_REQ_ID,
-    L2_CHUNK_MAX_DATA_SIZE,
-    L1_TIMEOUT_MS_DEFAULT,
     L1_LEN_MAX,
+    L1_TIMEOUT_MS_DEFAULT,
+    L2_RESEND_REQ_ID,
+    L2_STATUS_CRC_ERR,
+    L2_STATUS_GEN_ERR,
+    L2_STATUS_HSK_ERR,
+    L2_STATUS_NO_RESP,
+    L2_STATUS_NO_SESSION,
+    L2_STATUS_REQUEST_CONT,
+    L2_STATUS_REQUEST_OK,
+    L2_STATUS_RESP_DISABLED,
+    L2_STATUS_RESULT_CONT,
+    L2_STATUS_RESULT_OK,
+    L2_STATUS_TAG_ERR,
+    L2_STATUS_UNKNOWN_ERR,
 )
 from .crc16 import add_crc, crc16
-from .l1 import L1Layer, L1Error
+from .l1 import L1Error, L1Layer
 
 if TYPE_CHECKING:
     from ..transport.base import Transport
@@ -254,7 +253,7 @@ class L2Layer:
             raise L2StatusError(
                 L2FrameStatus.UNKNOWN_ERR,
                 f"Unknown status byte: 0x{status_byte:02X}"
-            )
+            ) from None
 
         # Extract data (between LEN and CRC)
         data = frame[3:3 + rsp_len]

@@ -17,8 +17,7 @@ from typing import TYPE_CHECKING, Any
 from .base import Transport
 
 if TYPE_CHECKING:
-    import gpiod
-    import spidev
+    pass
 
 
 @dataclass
@@ -102,7 +101,7 @@ class LinuxSpiTransport(Transport):
         """
         # Import dependencies
         try:
-            import spidev
+            import spidev  # type: ignore[import-not-found]
         except ImportError as e:
             raise ImportError(
                 "spidev is required for SPI transport. "
@@ -110,7 +109,7 @@ class LinuxSpiTransport(Transport):
             ) from e
 
         try:
-            import gpiod
+            import gpiod  # type: ignore[import-not-found]
         except ImportError as e:
             raise ImportError(
                 "gpiod is required for SPI transport. "
@@ -273,7 +272,7 @@ class LinuxSpiTransport(Transport):
             result = self._spi.xfer2(list(data))
             return bytes(result)
         except Exception as e:
-            raise IOError(f"SPI transfer failed: {e}") from e
+            raise OSError(f"SPI transfer failed: {e}") from e
 
     def cs_low(self) -> None:
         """
@@ -287,10 +286,10 @@ class LinuxSpiTransport(Transport):
             raise RuntimeError("Transport not open. Call open() first.")
 
         try:
-            import gpiod
+            import gpiod  # type: ignore[import-not-found]
             self._cs_line.set_value(self.config.cs_pin, gpiod.line.Value.INACTIVE)
         except Exception as e:
-            raise IOError(f"Failed to assert CS: {e}") from e
+            raise OSError(f"Failed to assert CS: {e}") from e
 
     def cs_high(self) -> None:
         """
@@ -304,10 +303,10 @@ class LinuxSpiTransport(Transport):
             raise RuntimeError("Transport not open. Call open() first.")
 
         try:
-            import gpiod
+            import gpiod  # type: ignore[import-not-found]
             self._cs_line.set_value(self.config.cs_pin, gpiod.line.Value.ACTIVE)
         except Exception as e:
-            raise IOError(f"Failed to deassert CS: {e}") from e
+            raise OSError(f"Failed to deassert CS: {e}") from e
 
     def delay_ms(self, ms: int) -> None:
         """
@@ -359,7 +358,7 @@ class LinuxSpiTransport(Transport):
             # Wait for edge event
             if self._int_line.wait_edge_events(timeout):
                 # Consume the event to clear it
-                events = self._int_line.read_edge_events()
+                self._int_line.read_edge_events()
                 # We got a rising edge
                 return True
             else:
@@ -367,7 +366,7 @@ class LinuxSpiTransport(Transport):
                 return False
 
         except Exception as e:
-            raise IOError(f"Failed to wait for interrupt: {e}") from e
+            raise OSError(f"Failed to wait for interrupt: {e}") from e
 
     @property
     def supports_interrupt(self) -> bool:

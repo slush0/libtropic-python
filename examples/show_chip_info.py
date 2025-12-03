@@ -24,7 +24,7 @@ import logging
 import sys
 
 from libtropic import Tropic01
-from libtropic.enums import StartupMode, FirmwareBank
+from libtropic.enums import FirmwareBank, StartupMode
 
 # Configure logging
 logging.basicConfig(

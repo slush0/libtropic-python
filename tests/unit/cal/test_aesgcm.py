@@ -6,7 +6,7 @@ Tests the _cal.aesgcm module using Wycheproof test vectors.
 
 import pytest
 
-from libtropic._cal import AesGcmDecryptContext, AesGcmEncryptContext, L3_TAG_SIZE
+from libtropic._cal import L3_TAG_SIZE, AesGcmDecryptContext, AesGcmEncryptContext
 
 from .conftest import generate_aesgcm_vectors
 

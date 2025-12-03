@@ -15,7 +15,6 @@ from libtropic import PairingKeySlot, Tropic01
 
 from ..conftest import generate_test_data
 
-
 # Pairing key slot limits
 PAIRING_KEY_SLOT_MIN = 0
 PAIRING_KEY_SLOT_MAX = 3

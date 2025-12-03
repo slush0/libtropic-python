@@ -5,7 +5,6 @@ Provides authenticated encryption using AES-GCM mode.
 Maps to: lt_aesgcm.h
 """
 
-from typing import Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
@@ -35,7 +34,7 @@ class AesGcmEncryptContext:
     Maps to: gcm_ctx (encrypt) from trezor_crypto
     """
 
-    def __init__(self, key: Optional[bytes] = None) -> None:
+    def __init__(self, key: bytes | None = None) -> None:
         """
         Create AES-GCM encryption context.
 
@@ -44,8 +43,8 @@ class AesGcmEncryptContext:
 
         Maps to: lt_aesgcm_encrypt_init() if key provided
         """
-        self._aesgcm: Optional[AESGCM] = None
-        self._key: Optional[bytearray] = None
+        self._aesgcm: AESGCM | None = None
+        self._key: bytearray | None = None
 
         if key is not None:
             self.init(key)
@@ -74,7 +73,7 @@ class AesGcmEncryptContext:
         self,
         iv: bytes,
         plaintext: bytes,
-        aad: Optional[bytes] = None
+        aad: bytes | None = None
     ) -> bytes:
         """
         Encrypt data with authentication.
@@ -141,7 +140,7 @@ class AesGcmDecryptContext:
     Maps to: gcm_ctx (decrypt) from trezor_crypto
     """
 
-    def __init__(self, key: Optional[bytes] = None) -> None:
+    def __init__(self, key: bytes | None = None) -> None:
         """
         Create AES-GCM decryption context.
 
@@ -150,8 +149,8 @@ class AesGcmDecryptContext:
 
         Maps to: lt_aesgcm_decrypt_init() if key provided
         """
-        self._aesgcm: Optional[AESGCM] = None
-        self._key: Optional[bytearray] = None
+        self._aesgcm: AESGCM | None = None
+        self._key: bytearray | None = None
 
         if key is not None:
             self.init(key)
@@ -180,7 +179,7 @@ class AesGcmDecryptContext:
         self,
         iv: bytes,
         ciphertext: bytes,
-        aad: Optional[bytes] = None
+        aad: bytes | None = None
     ) -> bytes:
         """
         Decrypt data and verify authentication tag.

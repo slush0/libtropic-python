@@ -2,6 +2,11 @@
 
 Python SDK for the TROPIC01 secure element from [Tropic Square](https://tropicsquare.com).
 
+
+ >[!WARNING]
+ > This is a community-driven project. The code is not officially supported or maintained by Tropic Square.
+ > Tropic Square is not responsible for this code. Do not use it for production unless you know what you are doing.
+
 ## ⚠️ Disclaimers
 
 - **SPI interface has not been tested** — the native Linux SPI transport is implemented but remains untested on real hardware.

@@ -16,14 +16,12 @@ import pytest
 from libtropic import MacAndDestroySlot, Tropic01
 
 from ..conftest import (
-    HMAC_LEN,
     MAC_AND_DESTROY_SLOT_MAX,
     MAC_AND_DESTROY_SLOT_MIN,
     generate_random_length,
     generate_test_data,
     xor_bytes,
 )
-
 
 # MAC-and-Destroy data size (input and output)
 MAC_AND_DESTROY_DATA_SIZE = 32

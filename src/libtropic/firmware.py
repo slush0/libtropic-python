@@ -8,7 +8,7 @@ Implements the ACAB silicon authenticated firmware update protocol.
 from typing import TYPE_CHECKING
 
 from .enums import DeviceMode, ReturnCode
-from .exceptions import TropicError, ParamError
+from .exceptions import ParamError, TropicError
 from .types import MUTABLE_FW_UPDATE_SIZE_MAX
 
 if TYPE_CHECKING:
@@ -16,7 +16,8 @@ if TYPE_CHECKING:
 
 
 # ACAB firmware update header size (first part of signed firmware file)
-# Format: req_len(1) + signature(64) + hash(32) + type(2) + padding(1) + header_version(1) + version(4)
+# Format: req_len(1) + signature(64) + hash(32) + type(2) + padding(1)
+#         + header_version(1) + version(4)
 ACAB_FW_HEADER_SIZE = 105
 
 # Maximum firmware size for ACAB silicon
@@ -102,8 +103,8 @@ class FirmwareUpdater:
         Maps to: lt_do_mutable_fw_update() [ACAB]
         """
         from ._protocol.constants import (
-            L2_MUTABLE_FW_UPDATE_REQ_ID,
             L2_MUTABLE_FW_UPDATE_DATA_REQ_ID,
+            L2_MUTABLE_FW_UPDATE_REQ_ID,
         )
 
         self._ensure_maintenance_mode()

@@ -38,7 +38,7 @@ import sys
 from pathlib import Path
 
 from libtropic import Tropic01
-from libtropic.enums import StartupMode, FirmwareBank, DeviceMode
+from libtropic.enums import DeviceMode, FirmwareBank, StartupMode
 
 # Configure logging
 logging.basicConfig(

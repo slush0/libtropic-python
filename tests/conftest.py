@@ -37,17 +37,14 @@ Environment Variables:
 
 import os
 import secrets
+from collections.abc import Generator
 from dataclasses import dataclass
-from typing import Generator
 
 import pytest
 
 from libtropic import (
-    EccCurve,
-    EccSlot,
     InvalidKeyError,
     LinuxSpiTransport,
-    MacAndDestroySlot,
     PairingKeySlot,
     SlotEmptyError,
     SpiConfig,
@@ -56,7 +53,6 @@ from libtropic import (
     UsbDongleConfig,
     UsbDongleTransport,
 )
-
 
 # =============================================================================
 # Test Configuration

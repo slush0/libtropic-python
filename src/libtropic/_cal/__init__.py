@@ -17,26 +17,26 @@ pluggable crypto backends (trezor_crypto, mbedtls_v4).
 """
 
 # AES-GCM
-from .aesgcm import AesGcmDecryptContext, AesGcmEncryptContext, L3_TAG_SIZE
-
-# SHA-256
-from .sha256 import DIGEST_LENGTH as SHA256_DIGEST_LENGTH
-from .sha256 import Sha256Context, sha256
-
-# HMAC-SHA256
-from .hmac_sha256 import HASH_LENGTH as HMAC_SHA256_HASH_LENGTH
-from .hmac_sha256 import hmac_sha256
-
-# X25519
-from .x25519 import KEY_SIZE as X25519_KEY_SIZE
-from .x25519 import x25519, x25519_scalarmult_base
+from .aesgcm import L3_TAG_SIZE, AesGcmDecryptContext, AesGcmEncryptContext
 
 # HKDF
 from .hkdf import OUTPUT_LENGTH as HKDF_OUTPUT_LENGTH
 from .hkdf import hkdf
 
+# HMAC-SHA256
+from .hmac_sha256 import HASH_LENGTH as HMAC_SHA256_HASH_LENGTH
+from .hmac_sha256 import hmac_sha256
+
 # Memory
 from .memzero import secure_memzero
+
+# SHA-256
+from .sha256 import DIGEST_LENGTH as SHA256_DIGEST_LENGTH
+from .sha256 import Sha256Context, sha256
+
+# X25519
+from .x25519 import KEY_SIZE as X25519_KEY_SIZE
+from .x25519 import x25519, x25519_scalarmult_base
 
 __all__ = [
     # AES-GCM

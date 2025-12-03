@@ -8,16 +8,14 @@ including chip status polling and response retrieval.
 from typing import TYPE_CHECKING
 
 from .constants import (
-    L1_CHIP_MODE_READY,
     L1_CHIP_MODE_ALARM,
+    L1_CHIP_MODE_READY,
     L1_CHIP_MODE_STARTUP,
     L1_GET_RESPONSE_REQ_ID,
+    L1_LEN_MAX,
     L1_READ_MAX_TRIES,
     L1_READ_RETRY_DELAY_MS,
     L1_TIMEOUT_MS_DEFAULT,
-    L1_LEN_MAX,
-    L2_STATUS_OFFSET,
-    L2_RSP_LEN_OFFSET,
 )
 
 if TYPE_CHECKING:
@@ -29,12 +27,12 @@ class L1Error(Exception):
     pass
 
 
-class L1ChipBusy(L1Error):
+class L1ChipBusyError(L1Error):
     """Chip is busy and not responding after max retries."""
     pass
 
 
-class L1ChipAlarm(L1Error):
+class L1ChipAlarmError(L1Error):
     """Chip is in ALARM mode."""
     pass
 
@@ -98,8 +96,8 @@ class L1Layer:
             Complete L2 response frame (including chip_status byte at offset 0)
 
         Raises:
-            L1ChipAlarm: If chip is in ALARM mode
-            L1ChipBusy: If chip doesn't respond after max retries
+            L1ChipAlarmError: If chip is in ALARM mode
+            L1ChipBusyError: If chip doesn't respond after max retries
             L1DataLengthError: If response length is invalid
             L1SpiError: If SPI transfer fails
         """
@@ -125,7 +123,7 @@ class L1Layer:
             # Check ALARM bit first (highest priority)
             if chip_status & L1_CHIP_MODE_ALARM:
                 self._transport.cs_high()
-                raise L1ChipAlarm(f"Chip in ALARM mode (status=0x{chip_status:02X})")
+                raise L1ChipAlarmError(f"Chip in ALARM mode (status=0x{chip_status:02X})")
 
             # Check if chip is ready
             if chip_status & L1_CHIP_MODE_READY:
@@ -174,7 +172,7 @@ class L1Layer:
                 # Use longer delay if in startup mode (no INT pin)
                 self._transport.delay_ms(L1_READ_RETRY_DELAY_MS)
 
-        raise L1ChipBusy(f"Chip busy after {L1_READ_MAX_TRIES} retries")
+        raise L1ChipBusyError(f"Chip busy after {L1_READ_MAX_TRIES} retries")
 
     def write(
         self,

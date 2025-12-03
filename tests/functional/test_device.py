@@ -18,7 +18,6 @@ import pytest
 from libtropic import (
     DeviceMode,
     NoSessionError,
-    PairingKeySlot,
     StartupMode,
     Tropic01,
 )

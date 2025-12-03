@@ -14,7 +14,6 @@ from libtropic import EccCurve, InvalidKeyError, Tropic01
 
 from ..conftest import ECC_SLOT_MAX, ECC_SLOT_MIN, generate_test_data
 
-
 # Signature length (same for both ECDSA and EdDSA)
 SIGNATURE_LEN = 64
 

@@ -6,7 +6,6 @@ Maps to: lt_sha256.h
 """
 
 import hashlib
-from typing import Optional
 
 # SHA-256 digest length in bytes
 DIGEST_LENGTH = 32
@@ -38,7 +37,7 @@ class Sha256Context:
 
         Maps to: lt_sha256_init()
         """
-        self._hasher: Optional[hashlib._Hash] = None
+        self._hasher: hashlib._Hash | None = None
 
     def start(self) -> None:
         """

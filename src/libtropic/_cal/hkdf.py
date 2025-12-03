@@ -8,7 +8,6 @@ Note: This is a simplified HKDF variant specific to TROPIC01 protocol,
 not the full RFC 5869 HKDF.
 """
 
-from typing import Tuple
 
 from .hmac_sha256 import hmac_sha256
 
@@ -20,7 +19,7 @@ def hkdf(
     chaining_key: bytes,
     input_data: bytes,
     num_outputs: int = 2
-) -> Tuple[bytes, bytes]:
+) -> tuple[bytes, bytes]:
     """
     Derive keys using HKDF as described in TROPIC01 datasheet.
 

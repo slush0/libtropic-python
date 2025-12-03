@@ -36,23 +36,23 @@ Decryption:
     - Output: RESULT || DATA
 """
 
-from typing import TYPE_CHECKING, Tuple
+from typing import TYPE_CHECKING
 
 from .constants import (
+    L3_RESULT_COUNTER_INVALID,
+    L3_RESULT_FAIL,
+    L3_RESULT_HARDWARE_FAIL,
+    L3_RESULT_INVALID_CMD,
+    L3_RESULT_INVALID_KEY,
+    L3_RESULT_OK,
+    L3_RESULT_SLOT_EMPTY,
+    L3_RESULT_SLOT_EXPIRED,
+    L3_RESULT_SLOT_INVALID,
+    L3_RESULT_SLOT_NOT_EMPTY,
+    L3_RESULT_UNAUTHORIZED,
+    L3_RESULT_UPDATE_ERR,
     L3_SIZE_SIZE,
     L3_TAG_SIZE,
-    L3_RESULT_OK,
-    L3_RESULT_FAIL,
-    L3_RESULT_UNAUTHORIZED,
-    L3_RESULT_INVALID_CMD,
-    L3_RESULT_SLOT_EMPTY,
-    L3_RESULT_SLOT_INVALID,
-    L3_RESULT_INVALID_KEY,
-    L3_RESULT_SLOT_NOT_EMPTY,
-    L3_RESULT_SLOT_EXPIRED,
-    L3_RESULT_UPDATE_ERR,
-    L3_RESULT_COUNTER_INVALID,
-    L3_RESULT_HARDWARE_FAIL,
 )
 
 if TYPE_CHECKING:
@@ -161,7 +161,7 @@ def encrypt_command(session: "SessionState", cmd_id: int, data: bytes = b"") -> 
     return bytes(frame)
 
 
-def decrypt_response(session: "SessionState", frame: bytes) -> Tuple[int, bytes]:
+def decrypt_response(session: "SessionState", frame: bytes) -> tuple[int, bytes]:
     """
     Decrypt L3 response from device.
 
@@ -275,30 +275,42 @@ def result_code_to_exception(result_code: int) -> Exception:
     Returns:
         Appropriate exception instance
     """
-    from ..exceptions import (
-        TropicError,
-        SlotEmptyError,
-        SlotNotEmptyError,
-        SlotInvalidError,
-        SlotExpiredError,
-        InvalidKeyError,
-        CounterInvalidError,
-        UnauthorizedError,
-        HardwareError,
-    )
     from ..enums import ReturnCode
+    from ..exceptions import (
+        CounterInvalidError,
+        HardwareError,
+        InvalidKeyError,
+        SlotEmptyError,
+        SlotExpiredError,
+        SlotInvalidError,
+        SlotNotEmptyError,
+        TropicError,
+        UnauthorizedError,
+    )
 
     exception_map = {
         L3_RESULT_FAIL: TropicError(ReturnCode.L3_FAIL, "Command failed"),
-        L3_RESULT_UNAUTHORIZED: UnauthorizedError(ReturnCode.L3_UNAUTHORIZED, "Operation not authorized"),
+        L3_RESULT_UNAUTHORIZED: UnauthorizedError(
+            ReturnCode.L3_UNAUTHORIZED, "Operation not authorized"
+        ),
         L3_RESULT_INVALID_CMD: TropicError(ReturnCode.L3_INVALID_CMD, "Invalid command ID"),
         L3_RESULT_SLOT_EMPTY: SlotEmptyError(ReturnCode.L3_SLOT_EMPTY, "Slot is empty"),
-        L3_RESULT_SLOT_INVALID: SlotInvalidError(ReturnCode.L3_SLOT_INVALID, "Invalid slot index"),
-        L3_RESULT_INVALID_KEY: InvalidKeyError(ReturnCode.L3_INVALID_KEY, "Invalid key or wrong key type"),
-        L3_RESULT_SLOT_NOT_EMPTY: SlotNotEmptyError(ReturnCode.L3_SLOT_NOT_EMPTY, "Slot is not empty"),
-        L3_RESULT_SLOT_EXPIRED: SlotExpiredError(ReturnCode.L3_SLOT_EXPIRED, "Slot has expired"),
+        L3_RESULT_SLOT_INVALID: SlotInvalidError(
+            ReturnCode.L3_SLOT_INVALID, "Invalid slot index"
+        ),
+        L3_RESULT_INVALID_KEY: InvalidKeyError(
+            ReturnCode.L3_INVALID_KEY, "Invalid key or wrong key type"
+        ),
+        L3_RESULT_SLOT_NOT_EMPTY: SlotNotEmptyError(
+            ReturnCode.L3_SLOT_NOT_EMPTY, "Slot is not empty"
+        ),
+        L3_RESULT_SLOT_EXPIRED: SlotExpiredError(
+            ReturnCode.L3_SLOT_EXPIRED, "Slot has expired"
+        ),
         L3_RESULT_UPDATE_ERR: TropicError(ReturnCode.L3_UPDATE_ERR, "Update operation failed"),
-        L3_RESULT_COUNTER_INVALID: CounterInvalidError(ReturnCode.L3_COUNTER_INVALID, "Counter not initialized or at zero"),
+        L3_RESULT_COUNTER_INVALID: CounterInvalidError(
+            ReturnCode.L3_COUNTER_INVALID, "Counter not initialized or at zero"
+        ),
         L3_RESULT_HARDWARE_FAIL: HardwareError(ReturnCode.L3_HARDWARE_FAIL, "Hardware failure"),
     }
 

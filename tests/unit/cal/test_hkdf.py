@@ -7,7 +7,6 @@ Note: libtropic uses a simplified HKDF variant specific to the TROPIC01 protocol
 which always produces two 32-byte outputs. This is NOT the full RFC 5869 HKDF.
 """
 
-import pytest
 
 from libtropic._cal import HKDF_OUTPUT_LENGTH, hkdf
 

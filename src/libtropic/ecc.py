@@ -175,7 +175,7 @@ class EccKeys:
         Maps to: lt_ecc_key_read()
         """
         from ._protocol.constants import L3_CMD_ECC_KEY_READ
-        from .enums import ReturnCode, EccKeyOrigin
+        from .enums import EccKeyOrigin, ReturnCode
         from .exceptions import ParamError
 
         slot_idx = int(slot)
