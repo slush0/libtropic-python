@@ -516,7 +516,8 @@ class Tropic01:
             programmer_version=data[46:50],
             # rfu_2 at 50:52
             serial_number=data[52:68],
-            part_number=data[68:84].decode('ascii', errors='replace').rstrip('\x00'),
+            # part_num_data: first byte is length, rest is ASCII string
+            part_number=data[69:69 + data[68]].decode('ascii', errors='replace'),
             prov_template_version=(data[84], data[85]),
             prov_template_tag=data[86:90],
             prov_spec_version=(data[90], data[91]),
