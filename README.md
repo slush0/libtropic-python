@@ -23,16 +23,16 @@ Python SDK for the TROPIC01 secure element from [Tropic Square](https://tropicsq
 
 ```bash
 # Basic installation
-pip install libtropic
+pip install git+https://github.com/slush0/libtropic-python.git
 
 # With USB dongle support (pyserial)
-pip install libtropic[usb]
+pip install "libtropic[usb] @ git+https://github.com/slush0/libtropic-python.git"
 
 # With native SPI support (Linux only)
-pip install libtropic[spi]
+pip install "libtropic[spi] @ git+https://github.com/slush0/libtropic-python.git"
 
 # All transports
-pip install libtropic[all]
+pip install "libtropic[all] @ git+https://github.com/slush0/libtropic-python.git"
 ```
 
 ## Quick Start
