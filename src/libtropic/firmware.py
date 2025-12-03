@@ -2,55 +2,60 @@
 Firmware update operations for libtropic.
 
 Provides firmware update functionality for TROPIC01 (maintenance mode only).
+Implements the ACAB silicon authenticated firmware update protocol.
 """
 
 from typing import TYPE_CHECKING
 
-from .enums import FirmwareBank
-from .types import (
-    MUTABLE_FW_UPDATE_SIZE_MAX_ABAB,
-    MUTABLE_FW_UPDATE_SIZE_MAX_ACAB,
-)
+from .enums import DeviceMode, ReturnCode
+from .exceptions import TropicError, ParamError
+from .types import MUTABLE_FW_UPDATE_SIZE_MAX_ACAB
 
 if TYPE_CHECKING:
     from .device import Tropic01
 
 
+# ACAB firmware update header size (first part of signed firmware file)
+# Format: req_len(1) + signature(64) + hash(32) + type(2) + padding(1) + header_version(1) + version(4)
+ACAB_FW_HEADER_SIZE = 105
+
+# Maximum firmware size for ACAB silicon
+MAX_FW_SIZE = MUTABLE_FW_UPDATE_SIZE_MAX_ACAB  # 30720 bytes
+
+
 class FirmwareUpdater:
     """
-    Firmware update operations.
+    Firmware update operations for ACAB silicon.
 
     TROPIC01 supports updating its mutable firmware (Application FW and
-    SPECT coprocessor FW) while in maintenance mode.
+    SPECT coprocessor FW) while in maintenance mode using authenticated
+    signed firmware files.
 
-    The chip has two banks for each firmware type:
-    - FW1/FW2: Application firmware banks
-    - SPECT1/SPECT2: SPECT coprocessor firmware banks
-
-    Firmware update process differs by silicon revision:
-    - ABAB: Manual bank selection, erase then write
-    - ACAB: Automatic bank management, authenticated update
+    The ACAB silicon uses an authenticated update protocol:
+    1. Send signed header with signature and hash
+    2. Send firmware data in authenticated chunks
+    3. Chip verifies signature and applies update to appropriate bank
 
     IMPORTANT: Firmware updates can brick the device if done incorrectly.
-    Always ensure you have valid firmware files from Tropic Square.
+    Only use official signed firmware files from Tropic Square.
 
-    Example (ABAB silicon):
+    Example:
+        from libtropic.firmware_data import CPU_FW_V2_0_0
+
         with Tropic01("/dev/ttyACM0") as device:
             # Must be in maintenance mode
             if device.mode != DeviceMode.MAINTENANCE:
                 device.reboot(StartupMode.MAINTENANCE_REBOOT)
 
-            # Erase and update firmware
-            device.firmware.erase(FirmwareBank.FW2)
-            device.firmware.update(FirmwareBank.FW2, firmware_data)
+            # Update firmware (chip manages banks automatically)
+            device.firmware.update(CPU_FW_V2_0_0)
 
             # Reboot to new firmware
             device.reboot(StartupMode.REBOOT)
     """
 
-    # Size limits by silicon revision
-    MAX_SIZE_ABAB = MUTABLE_FW_UPDATE_SIZE_MAX_ABAB
-    MAX_SIZE_ACAB = MUTABLE_FW_UPDATE_SIZE_MAX_ACAB
+    # Maximum firmware size
+    MAX_SIZE = MAX_FW_SIZE
 
     def __init__(self, device: 'Tropic01'):
         """
@@ -61,78 +66,141 @@ class FirmwareUpdater:
         """
         self._device = device
 
-    def erase(self, bank: FirmwareBank | int) -> None:
-        """
-        Erase firmware bank (ABAB silicon only).
+    def _ensure_maintenance_mode(self) -> None:
+        """Ensure device is in maintenance mode."""
+        if self._device.mode != DeviceMode.MAINTENANCE:
+            raise TropicError(
+                ReturnCode.FAIL,
+                "Firmware operations require maintenance mode. "
+                "Call device.reboot(StartupMode.MAINTENANCE_REBOOT) first."
+            )
 
-        Erases the specified firmware bank in preparation for update.
-        Must be called before update() on ABAB silicon.
+    def update(self, firmware_data: bytes) -> None:
+        """
+        Update firmware using ACAB authenticated protocol.
+
+        Sends the signed firmware file to the device. The firmware file
+        must be a properly signed binary from Tropic Square with the
+        `*_signed_chunks.bin` format.
+
+        The chip automatically manages firmware banks - you don't need
+        to specify which bank to use.
 
         Args:
-            bank: Firmware bank to erase (FW1, FW2, SPECT1, or SPECT2)
+            firmware_data: Complete signed firmware binary
+                          (e.g., fw_v2.0.0.hex32_signed_chunks.bin)
 
         Raises:
             TropicError: If device is not in maintenance mode
-            ParamError: If bank is invalid
+            ParamError: If firmware data is invalid or too large
 
         Note:
-            This function is only available on ABAB silicon revision.
-            ACAB silicon handles bank management automatically.
+            Use firmware binaries from libtropic.firmware_data module
+            or load official signed binaries from Tropic Square.
 
-        Maps to: lt_mutable_fw_erase() [ABAB only]
+        Maps to: lt_do_mutable_fw_update() [ACAB]
         """
-        raise NotImplementedError()
+        from ._protocol.constants import (
+            L2_MUTABLE_FW_UPDATE_REQ_ID_ACAB,
+            L2_MUTABLE_FW_UPDATE_DATA_REQ_ID,
+        )
 
-    def update(
-        self,
-        bank: FirmwareBank | int,
-        firmware_data: bytes
-    ) -> None:
+        self._ensure_maintenance_mode()
+
+        # Validate firmware data
+        if len(firmware_data) == 0:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                "Firmware data cannot be empty"
+            )
+        if len(firmware_data) <= ACAB_FW_HEADER_SIZE:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Firmware data too small: {len(firmware_data)} bytes "
+                f"(must be > {ACAB_FW_HEADER_SIZE} bytes for ACAB format)"
+            )
+        if len(firmware_data) > self.MAX_SIZE:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Firmware data too large: {len(firmware_data)} bytes "
+                f"(max {self.MAX_SIZE} bytes)"
+            )
+
+        # Get L2 layer
+        l2 = self._device._ensure_open()
+
+        # =====================================================================
+        # Phase 1: Send authenticated header (Mutable_FW_Update request)
+        # =====================================================================
+        # Header format in firmware file (first 105 bytes):
+        #   req_len(1) + signature(64) + hash(32) + type(2) + padding(1) +
+        #   header_version(1) + version(4)
+        #
+        # L2 request format (104 bytes, without req_len prefix):
+        #   signature(64) + hash(32) + type(2) + padding(1) +
+        #   header_version(1) + version(4)
+
+        # Extract header components (skip first byte which is req_len)
+        header_data = firmware_data[1:ACAB_FW_HEADER_SIZE]
+
+        # Send Mutable_FW_Update request with header
+        l2.send_receive(L2_MUTABLE_FW_UPDATE_REQ_ID_ACAB, header_data)
+
+        # =====================================================================
+        # Phase 2: Send firmware data chunks (Mutable_FW_Update_Data requests)
+        # =====================================================================
+        # Data chunks start after the header
+        # Each chunk in the file is prefixed with a length byte
+        # File format: [chunk_len_byte][chunk_data...]
+        # L2 format: [req_id][req_len][chunk_data...][crc]
+        # The L2 layer sets req_len automatically, so we only send chunk_data
+
+        chunk_index = ACAB_FW_HEADER_SIZE
+        fw_size = len(firmware_data)
+
+        while chunk_index < fw_size:
+            # Read chunk length from file (this is req_len value)
+            chunk_payload_len = firmware_data[chunk_index]
+
+            # Validate chunk boundaries
+            if chunk_index + 1 + chunk_payload_len > fw_size:
+                raise ParamError(
+                    ReturnCode.PARAM_ERR,
+                    f"Invalid firmware chunk at offset {chunk_index}: "
+                    f"chunk extends beyond file end"
+                )
+
+            # Extract chunk data (skip the length byte - L2 layer adds req_len)
+            chunk_data = firmware_data[chunk_index + 1:chunk_index + 1 + chunk_payload_len]
+
+            # Send Mutable_FW_Update_Data request
+            l2.send_receive(L2_MUTABLE_FW_UPDATE_DATA_REQ_ID, chunk_data)
+
+            # Move to next chunk (length byte + payload)
+            chunk_index += 1 + chunk_payload_len
+
+    def update_cpu(self) -> None:
         """
-        Update firmware in specified bank.
+        Update CPU firmware to the latest bundled version (v2.0.0).
 
-        Writes firmware data to the specified bank. On ABAB silicon,
-        erase() must be called first. On ACAB silicon, the chip handles
-        bank management automatically.
-
-        Args:
-            bank: Target firmware bank (FW1, FW2, SPECT1, or SPECT2)
-                  On ACAB silicon, this parameter is ignored.
-            firmware_data: Firmware binary data
+        Convenience method that uses the bundled firmware binary.
 
         Raises:
             TropicError: If device is not in maintenance mode
-            ParamError: If bank is invalid or data exceeds size limit
-
-        Note:
-            Maximum firmware size differs by silicon:
-            - ABAB: 25,600 bytes
-            - ACAB: 30,720 bytes
-
-        Maps to: lt_mutable_fw_update() / lt_do_mutable_fw_update()
+            ImportError: If firmware data module is not available
         """
-        raise NotImplementedError()
+        from .firmware_data import CPU_FW_V2_0_0
+        self.update(bytes(CPU_FW_V2_0_0))
 
-    def update_complete(
-        self,
-        bank: FirmwareBank | int,
-        firmware_data: bytes
-    ) -> None:
+    def update_spect(self) -> None:
         """
-        Perform complete firmware update (erase + write).
+        Update SPECT coprocessor firmware to the latest bundled version (v1.0.0).
 
-        Convenience method that erases the bank and writes new firmware
-        in one operation. Works on both ABAB and ACAB silicon.
-
-        Args:
-            bank: Target firmware bank (FW1, FW2, SPECT1, or SPECT2)
-                  On ACAB silicon, this parameter is ignored.
-            firmware_data: Firmware binary data
+        Convenience method that uses the bundled firmware binary.
 
         Raises:
             TropicError: If device is not in maintenance mode
-            ParamError: If bank is invalid or data exceeds size limit
-
-        Maps to: lt_do_mutable_fw_update()
+            ImportError: If firmware data module is not available
         """
-        raise NotImplementedError()
+        from .firmware_data import SPECT_FW_V1_0_0
+        self.update(bytes(SPECT_FW_V1_0_0))

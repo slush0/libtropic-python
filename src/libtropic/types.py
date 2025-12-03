@@ -4,7 +4,13 @@ Data types for libtropic Python bindings.
 Provides dataclasses and typed structures matching the C SDK.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .enums import ConfigAddress
 
 from .enums import EccCurve, EccKeyOrigin
 
@@ -30,7 +36,7 @@ R_MEM_DATA_SLOT_MAX = 511
 MCOUNTER_VALUE_MAX = 0xFFFFFFFE
 MAC_AND_DESTROY_DATA_SIZE = 32
 RANDOM_VALUE_MAX_LEN = 255
-PING_LEN_MAX = 255
+PING_LEN_MAX = 4096
 EDDSA_MSG_LEN_MAX = 4096
 
 # Firmware update limits
@@ -189,6 +195,49 @@ class DeviceConfig:
     uap_mcounter_get: int = 0xFFFFFFFF
     uap_mcounter_update: int = 0xFFFFFFFF
     uap_mac_and_destroy: int = 0xFFFFFFFF
+
+    @classmethod
+    def from_address_dict(cls, config_dict: dict[ConfigAddress, int]) -> DeviceConfig:
+        """
+        Create DeviceConfig from dict mapping ConfigAddress to values.
+
+        Args:
+            config_dict: Dictionary mapping ConfigAddress enum to 32-bit values
+
+        Returns:
+            DeviceConfig instance with values from the dict
+        """
+        from .enums import ConfigAddress
+
+        return cls(
+            start_up=config_dict.get(ConfigAddress.START_UP, 0xFFFFFFFF),
+            sensors=config_dict.get(ConfigAddress.SENSORS, 0xFFFFFFFF),
+            debug=config_dict.get(ConfigAddress.DEBUG, 0xFFFFFFFF),
+            gpo=config_dict.get(ConfigAddress.GPO, 0xFFFFFFFF),
+            sleep_mode=config_dict.get(ConfigAddress.SLEEP_MODE, 0xFFFFFFFF),
+            uap_pairing_key_write=config_dict.get(ConfigAddress.UAP_PAIRING_KEY_WRITE, 0xFFFFFFFF),
+            uap_pairing_key_read=config_dict.get(ConfigAddress.UAP_PAIRING_KEY_READ, 0xFFFFFFFF),
+            uap_pairing_key_invalidate=config_dict.get(ConfigAddress.UAP_PAIRING_KEY_INVALIDATE, 0xFFFFFFFF),
+            uap_r_config_write_erase=config_dict.get(ConfigAddress.UAP_R_CONFIG_WRITE_ERASE, 0xFFFFFFFF),
+            uap_r_config_read=config_dict.get(ConfigAddress.UAP_R_CONFIG_READ, 0xFFFFFFFF),
+            uap_i_config_write=config_dict.get(ConfigAddress.UAP_I_CONFIG_WRITE, 0xFFFFFFFF),
+            uap_i_config_read=config_dict.get(ConfigAddress.UAP_I_CONFIG_READ, 0xFFFFFFFF),
+            uap_ping=config_dict.get(ConfigAddress.UAP_PING, 0xFFFFFFFF),
+            uap_r_mem_data_write=config_dict.get(ConfigAddress.UAP_R_MEM_DATA_WRITE, 0xFFFFFFFF),
+            uap_r_mem_data_read=config_dict.get(ConfigAddress.UAP_R_MEM_DATA_READ, 0xFFFFFFFF),
+            uap_r_mem_data_erase=config_dict.get(ConfigAddress.UAP_R_MEM_DATA_ERASE, 0xFFFFFFFF),
+            uap_random_value_get=config_dict.get(ConfigAddress.UAP_RANDOM_VALUE_GET, 0xFFFFFFFF),
+            uap_ecc_key_generate=config_dict.get(ConfigAddress.UAP_ECC_KEY_GENERATE, 0xFFFFFFFF),
+            uap_ecc_key_store=config_dict.get(ConfigAddress.UAP_ECC_KEY_STORE, 0xFFFFFFFF),
+            uap_ecc_key_read=config_dict.get(ConfigAddress.UAP_ECC_KEY_READ, 0xFFFFFFFF),
+            uap_ecc_key_erase=config_dict.get(ConfigAddress.UAP_ECC_KEY_ERASE, 0xFFFFFFFF),
+            uap_ecdsa_sign=config_dict.get(ConfigAddress.UAP_ECDSA_SIGN, 0xFFFFFFFF),
+            uap_eddsa_sign=config_dict.get(ConfigAddress.UAP_EDDSA_SIGN, 0xFFFFFFFF),
+            uap_mcounter_init=config_dict.get(ConfigAddress.UAP_MCOUNTER_INIT, 0xFFFFFFFF),
+            uap_mcounter_get=config_dict.get(ConfigAddress.UAP_MCOUNTER_GET, 0xFFFFFFFF),
+            uap_mcounter_update=config_dict.get(ConfigAddress.UAP_MCOUNTER_UPDATE, 0xFFFFFFFF),
+            uap_mac_and_destroy=config_dict.get(ConfigAddress.UAP_MAC_AND_DESTROY, 0xFFFFFFFF),
+        )
 
 
 # =============================================================================

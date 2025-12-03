@@ -142,14 +142,14 @@ class Configuration:
         # Send command - no data, response is empty (just result code)
         self._device._send_l3_command(L3_CMD_R_CONFIG_ERASE, b"")
 
-    def read_all_r(self) -> dict[ConfigAddress, int]:
+    def read_all_r(self) -> DeviceConfig:
         """
         Read all R-Config objects.
 
         Convenience method that reads all configuration objects at once.
 
         Returns:
-            Dict mapping ConfigAddress to 32-bit values
+            DeviceConfig with all R-Config values
 
         Raises:
             NoSessionError: If no secure session is active
@@ -160,7 +160,7 @@ class Configuration:
         result = {}
         for addr in ConfigAddress:
             result[addr] = self.read_r(addr)
-        return result
+        return DeviceConfig.from_address_dict(result)
 
     def write_all_r(self, config: dict[ConfigAddress, int]) -> None:
         """
@@ -267,14 +267,14 @@ class Configuration:
         # Send command - response is empty (just result code)
         self._device._send_l3_command(L3_CMD_I_CONFIG_WRITE, bytes(cmd_data))
 
-    def read_all_i(self) -> dict[ConfigAddress, int]:
+    def read_all_i(self) -> DeviceConfig:
         """
         Read all I-Config objects.
 
         Convenience method that reads all I-Config values at once.
 
         Returns:
-            Dict mapping ConfigAddress to 32-bit values
+            DeviceConfig with all I-Config values
 
         Raises:
             NoSessionError: If no secure session is active
@@ -285,7 +285,7 @@ class Configuration:
         result = {}
         for addr in ConfigAddress:
             result[addr] = self.read_i(addr)
-        return result
+        return DeviceConfig.from_address_dict(result)
 
     def write_all_i(self, config: dict[ConfigAddress, int]) -> None:
         """
@@ -295,9 +295,11 @@ class Configuration:
         config will be written. This operation is IRREVERSIBLE.
 
         WARNING: This permanently modifies I-Config. Only 0-bits are written.
+        I-Config resides in I-Memory which has narrower operating temperature
+        range (-20°C to 85°C).
 
         Args:
-            config: DeviceConfig with desired final values
+            config: Dict mapping ConfigAddress to desired final values
                     (0 bits will be written, 1 bits ignored)
 
         Raises:
@@ -307,4 +309,11 @@ class Configuration:
 
         Maps to: lt_write_whole_I_config()
         """
-        raise NotImplementedError()
+        # Iterate through all config addresses in the provided dict
+        for addr, value in config.items():
+            # For each bit position (0-31), if the bit is 0 in the config value,
+            # write it to I-Config (irreversible transition from 1 to 0)
+            for bit_index in range(32):
+                if not (value & (1 << bit_index)):
+                    # Bit is 0 - write it to I-Config
+                    self.write_i_bit(addr, bit_index)

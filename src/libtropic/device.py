@@ -538,17 +538,13 @@ class Tropic01:
         if len(data) < 4:
             raise TropicError(ReturnCode.FAIL, f"RISC-V FW version data too short: {len(data)} bytes")
 
-        # Version is 4 bytes: [major, minor, patch, build]
-        # Note: If in startup mode, highest bit is set
-        version = int.from_bytes(data[0:4], 'big')
-        is_bootloader = bool(version & 0x80000000)
-        version &= 0x7FFFFFFF  # Clear startup flag
-
+        # Version bytes: [build, patch, minor, major|flag]
+        # Note: If in startup mode, highest bit of major (data[3]) is set
         return FirmwareVersion(
-            major=(version >> 24) & 0xFF,
-            minor=(version >> 16) & 0xFF,
-            patch=(version >> 8) & 0xFF,
-            build=version & 0xFF,
+            major=data[3] & 0x7F,
+            minor=data[2],
+            patch=data[1],
+            build=data[0],
         )
 
     def get_spect_firmware_version(self) -> FirmwareVersion:
@@ -565,16 +561,13 @@ class Tropic01:
         if len(data) < 4:
             raise TropicError(ReturnCode.FAIL, f"SPECT FW version data too short: {len(data)} bytes")
 
-        # Version is 4 bytes: [major, minor, patch, build]
-        # Note: If in startup mode, this returns 0x80000000 (dummy value)
-        version = int.from_bytes(data[0:4], 'big')
-        version &= 0x7FFFFFFF  # Clear startup flag
-
+        # Version bytes: [build, patch, minor, major|flag]
+        # Note: If in startup mode, this returns a dummy value with high bit set
         return FirmwareVersion(
-            major=(version >> 24) & 0xFF,
-            minor=(version >> 16) & 0xFF,
-            patch=(version >> 8) & 0xFF,
-            build=version & 0xFF,
+            major=data[3] & 0x7F,
+            minor=data[2],
+            patch=data[1],
+            build=data[0],
         )
 
     def get_firmware_header(self, bank: FirmwareBank) -> FirmwareHeader:

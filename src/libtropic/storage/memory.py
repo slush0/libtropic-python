@@ -131,8 +131,19 @@ class DataMemory:
         # Response: padding(3B) + data(variable)
         response = self._device._send_l3_command(L3_CMD_R_MEM_DATA_READ, cmd_data)
 
-        # Skip 3 bytes of padding, return data
-        return response[3:]
+        # Skip 3 bytes of padding
+        data = response[3:]
+
+        # Check if slot is empty (device returns OK but with no data)
+        # This matches C library behavior in lt_r_mem_data_read()
+        if len(data) == 0:
+            from ..exceptions import SlotEmptyError
+            raise SlotEmptyError(
+                ReturnCode.L3_R_MEM_DATA_READ_SLOT_EMPTY,
+                "Slot is empty"
+            )
+
+        return data
 
     def erase(self, slot: int) -> None:
         """
