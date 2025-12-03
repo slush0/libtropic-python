@@ -74,6 +74,52 @@ class ChipId:
     prov_spec_tag: bytes           # 4 bytes
     batch_id: bytes                # 4 bytes
 
+    def __str__(self) -> str:
+        """
+        Pretty-print chip identification info.
+
+        Maps to: lt_print_chip_id()
+        """
+        # Decode package type
+        pkg_types = {
+            0x0000: "Bare silicon die",
+            0x0001: "QFN32, 4x4mm",
+        }
+        pkg_str = pkg_types.get(self.package_type_id, "Unknown")
+
+        # Decode fab ID
+        fab_ids = {
+            0x001: "Tropic Square Lab",
+            0x002: "EPS Global - Brno",
+        }
+        fab_str = fab_ids.get(self.fab_id, "Unknown")
+
+        # FL test status
+        fl_status = "PASSED" if self.fl_chip_info[0] == 0x01 else "N/A"
+        func_status = "PASSED" if self.func_test_info[0] == 0x01 else "N/A"
+
+        return (
+            f"ChipId:\n"
+            f"  CHIP_ID version      = 0x{self.chip_id_version.hex()}\n"
+            f"  FL_CHIP_INFO         = 0x{self.fl_chip_info.hex()} ({fl_status})\n"
+            f"  MAN_FUNC_TEST        = 0x{self.func_test_info.hex()} ({func_status})\n"
+            f"  Silicon revision     = {self.silicon_rev}\n"
+            f"  Package ID           = 0x{self.package_type_id:04X} ({pkg_str})\n"
+            f"  Prov info version    = 0x{self.provisioning_version:02X}\n"
+            f"  Fab ID               = 0x{self.fab_id:03X} ({fab_str})\n"
+            f"  P/N ID (short)       = 0x{self.short_part_number:03X}\n"
+            f"  Prov date            = 0x{self.provisioning_date.hex()}\n"
+            f"  HSM HW/FW/SW ver     = 0x{self.hsm_version.hex()}\n"
+            f"  Programmer ver       = 0x{self.programmer_version.hex()}\n"
+            f"  S/N                  = 0x{self.serial_number.hex()}\n"
+            f"  P/N (long)           = {self.part_number}\n"
+            f"  Prov template ver    = v{self.prov_template_version[0]}.{self.prov_template_version[1]}\n"
+            f"  Prov template tag    = 0x{self.prov_template_tag.hex()}\n"
+            f"  Prov spec ver        = v{self.prov_spec_version[0]}.{self.prov_spec_version[1]}\n"
+            f"  Prov spec tag        = 0x{self.prov_spec_tag.hex()}\n"
+            f"  Batch ID             = 0x{self.batch_id.hex()}"
+        )
+
 
 @dataclass
 class FirmwareVersion:
@@ -103,6 +149,50 @@ class FirmwareHeader:
     content_hash: bytes            # SHA256 hash of firmware content
     header_version: int = 1        # Header format version
     pair_version: int | None = None  # Paired version (boot v2 only)
+
+    def __str__(self) -> str:
+        """
+        Pretty-print firmware header info.
+
+        Maps to: lt_print_fw_header()
+        """
+        # Decode firmware type
+        fw_types = {
+            1: "RISC-V CPU FW",
+            2: "SPECT FW",
+        }
+        type_str = fw_types.get(self.fw_type, f"Unknown ({self.fw_type})")
+
+        # Parse version bytes (packed as major.minor.patch.build)
+        ver_build = (self.version >> 0) & 0xFF
+        ver_patch = (self.version >> 8) & 0xFF
+        ver_minor = (self.version >> 16) & 0xFF
+        ver_major = (self.version >> 24) & 0xFF
+        ver_str = f"v{ver_major}.{ver_minor}.{ver_patch}"
+        if ver_build:
+            ver_str += f".{ver_build}"
+
+        lines = [
+            f"FirmwareHeader:",
+            f"  FW type              = {self.fw_type} ({type_str})",
+            f"  FW header version    = 0x{self.header_version:02X}",
+            f"  FW version           = 0x{self.version:08X} ({ver_str})",
+            f"  FW size              = {self.size} bytes",
+            f"  GIT hash             = 0x{self.git_hash.hex()}",
+            f"  Content hash         = 0x{self.content_hash.hex()}",
+        ]
+
+        if self.pair_version is not None:
+            pair_build = (self.pair_version >> 0) & 0xFF
+            pair_patch = (self.pair_version >> 8) & 0xFF
+            pair_minor = (self.pair_version >> 16) & 0xFF
+            pair_major = (self.pair_version >> 24) & 0xFF
+            pair_str = f"v{pair_major}.{pair_minor}.{pair_patch}"
+            if pair_build:
+                pair_str += f".{pair_build}"
+            lines.append(f"  Pair version         = 0x{self.pair_version:08X} ({pair_str})")
+
+        return "\n".join(lines)
 
 
 # =============================================================================

@@ -40,7 +40,9 @@ class FirmwareUpdater:
     Only use official signed firmware files from Tropic Square.
 
     Example:
-        from libtropic.firmware_data import CPU_FW_V2_0_0
+        # Load signed firmware binary (user's responsibility)
+        with open("fw_v2.0.0.hex32_signed_chunks.bin", "rb") as f:
+            firmware_data = f.read()
 
         with Tropic01("/dev/ttyACM0") as device:
             # Must be in maintenance mode
@@ -48,7 +50,7 @@ class FirmwareUpdater:
                 device.reboot(StartupMode.MAINTENANCE_REBOOT)
 
             # Update firmware (chip manages banks automatically)
-            device.firmware.update(CPU_FW_V2_0_0)
+            device.firmware.update(firmware_data)
 
             # Reboot to new firmware
             device.reboot(StartupMode.REBOOT)
@@ -95,8 +97,7 @@ class FirmwareUpdater:
             ParamError: If firmware data is invalid or too large
 
         Note:
-            Use firmware binaries from libtropic.firmware_data module
-            or load official signed binaries from Tropic Square.
+            Use official signed firmware binaries from Tropic Square.
 
         Maps to: lt_do_mutable_fw_update() [ACAB]
         """
@@ -178,29 +179,3 @@ class FirmwareUpdater:
 
             # Move to next chunk (length byte + payload)
             chunk_index += 1 + chunk_payload_len
-
-    def update_cpu(self) -> None:
-        """
-        Update CPU firmware to the latest bundled version (v2.0.0).
-
-        Convenience method that uses the bundled firmware binary.
-
-        Raises:
-            TropicError: If device is not in maintenance mode
-            ImportError: If firmware data module is not available
-        """
-        from .firmware_data import CPU_FW_V2_0_0
-        self.update(bytes(CPU_FW_V2_0_0))
-
-    def update_spect(self) -> None:
-        """
-        Update SPECT coprocessor firmware to the latest bundled version (v1.0.0).
-
-        Convenience method that uses the bundled firmware binary.
-
-        Raises:
-            TropicError: If device is not in maintenance mode
-            ImportError: If firmware data module is not available
-        """
-        from .firmware_data import SPECT_FW_V1_0_0
-        self.update(bytes(SPECT_FW_V1_0_0))
