@@ -1,0 +1,3 @@
+[submodule "libtropic-upstream"]
+	path = libtropic-upstream
+	url = https://github.com/tropicsquare/libtropic.git
