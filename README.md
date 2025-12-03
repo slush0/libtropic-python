@@ -1,6 +1,6 @@
 # libtropic-python
 
-Python bindings for the TROPIC01 secure element from [Tropic Square](https://tropicsquare.com).
+Python SDK for the TROPIC01 secure element from [Tropic Square](https://tropicsquare.com).
 
 ## ⚠️ Disclaimers
 
