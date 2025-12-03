@@ -47,17 +47,13 @@ with Tropic01("/dev/ttyACM0") as device:
     # Check device mode
     print(f"Device mode: {device.mode.name}")
 
-    # Get device public key (required for session handshake)
-    stpub = device.get_device_public_key()
-
-    # Start secure session
+    # Verify chip certificate and start secure session
     # Use SH0_*_PROD keys for production chips (default)
     # Use SH0_*_ENG_SAMPLE keys for engineering sample chips (TROPIC01-ES)
-    device.start_session(
-        stpub=stpub,
-        slot=0,
+    device.verify_chip_and_start_session(
         private_key=SH0_PRIV_PROD,
         public_key=SH0_PUB_PROD,
+        slot=0,
     )
 
     # Generate ECC key
@@ -82,12 +78,10 @@ with connect_spi(
     cs_pin=8,
     int_pin=25  # optional
 ) as device:
-    stpub = device.get_device_public_key()
-    device.start_session(
-        stpub=stpub,
-        slot=0,
+    device.verify_chip_and_start_session(
         private_key=SH0_PRIV_PROD,
         public_key=SH0_PUB_PROD,
+        slot=0,
     )
     # ... use device
 ```
@@ -100,12 +94,12 @@ with connect_spi(
 from libtropic import Tropic01
 
 device = Tropic01(transport)
-device.open()                    # Initialize (or use context manager)
-device.mode                      # Get current mode (MAINTENANCE/APPLICATION/ALARM)
-device.start_session(...)        # Start encrypted session
-device.abort_session()           # End session
-device.reboot(mode)              # Reboot device
-device.close()                   # Cleanup
+device.open()                              # Initialize (or use context manager)
+device.mode                                # Get current mode (MAINTENANCE/APPLICATION/ALARM)
+device.verify_chip_and_start_session(...)  # Verify chip and start encrypted session
+device.abort_session()                     # End session
+device.reboot(mode)                        # Reboot device
+device.close()                             # Cleanup
 ```
 
 ### Sub-modules

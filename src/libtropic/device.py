@@ -139,11 +139,13 @@ class Tropic01:
 
     With Secure Session:
         with Tropic01("/dev/ttyACM0") as device:
-            # Start secure session (required for most operations)
+            # Get device public key and start secure session
+            stpub = device.get_device_public_key()
             device.start_session(
+                stpub=stpub,
+                slot=0,
                 private_key=sh0_priv,
                 public_key=sh0_pub,
-                slot=0
             )
 
             # Now you can use cryptographic functions
