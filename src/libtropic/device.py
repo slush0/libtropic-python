@@ -14,7 +14,13 @@ from .enums import (
     DeviceMode,
     FirmwareBank,
     PairingKeySlot,
+    ReturnCode,
     StartupMode,
+)
+from .exceptions import (
+    DeviceAlarmError,
+    RebootError,
+    TropicError,
 )
 from .firmware import FirmwareUpdater
 from .mac_and_destroy import MacAndDestroy
@@ -29,6 +35,25 @@ from .types import (
     FirmwareHeader,
     FirmwareVersion,
 )
+from ._protocol import (
+    L2Layer,
+    L1_CHIP_MODE_READY,
+    L1_CHIP_MODE_ALARM,
+    L1_CHIP_MODE_STARTUP,
+    L2_GET_INFO_REQ_ID,
+    L2_STARTUP_REQ_ID,
+    L2_SLEEP_REQ_ID,
+    L2_GET_LOG_REQ_ID,
+    L2_GET_INFO_OBJECT_ID_CHIP_ID,
+    L2_GET_INFO_OBJECT_ID_RISCV_FW_VER,
+    L2_GET_INFO_OBJECT_ID_SPECT_FW_VER,
+    L2_GET_INFO_OBJECT_ID_FW_BANK,
+    STARTUP_ID_REBOOT,
+    STARTUP_ID_MAINTENANCE,
+    SLEEP_KIND_SLEEP,
+    REBOOT_DELAY_MS,
+)
+from ._protocol.l1 import L1ChipAlarm
 
 
 class Tropic01:
@@ -116,6 +141,9 @@ class Tropic01:
         self._is_open = False
         self._has_session = False
 
+        # Protocol layers (initialized on open)
+        self._l2: L2Layer | None = None
+
         # Sub-modules (lazily initialized)
         self._ecc: EccKeys | None = None
         self._random: RandomGenerator | None = None
@@ -156,7 +184,16 @@ class Tropic01:
 
         Maps to: lt_init()
         """
-        raise NotImplementedError()
+        if self._is_open:
+            return
+
+        # Open the transport (USB dongle, SPI, etc.)
+        self._transport.open()
+
+        # Initialize L2 protocol layer
+        self._l2 = L2Layer(self._transport)
+
+        self._is_open = True
 
     def close(self) -> None:
         """
@@ -167,11 +204,38 @@ class Tropic01:
 
         Maps to: lt_deinit()
         """
-        raise NotImplementedError()
+        if not self._is_open:
+            return
+
+        # Abort session if active (ignore errors during cleanup)
+        if self._has_session:
+            try:
+                self.abort_session()
+            except Exception:
+                pass
+
+        # Clear session state
+        self._has_session = False
+        self._l2 = None
+
+        # Close transport if we own it
+        if self._owns_transport:
+            try:
+                self._transport.close()
+            except Exception:
+                pass
+
+        self._is_open = False
 
     # =========================================================================
     # Device Information
     # =========================================================================
+
+    def _ensure_open(self) -> L2Layer:
+        """Ensure device is open and return L2 layer."""
+        if not self._is_open or self._l2 is None:
+            raise RuntimeError("Device not open. Call open() first or use as context manager.")
+        return self._l2
 
     @property
     def mode(self) -> DeviceMode:
@@ -186,7 +250,44 @@ class Tropic01:
 
         Maps to: lt_get_tr01_mode()
         """
-        raise NotImplementedError()
+        l2 = self._ensure_open()
+
+        try:
+            chip_status = l2.l1.get_chip_status()
+        except L1ChipAlarm:
+            return DeviceMode.ALARM
+
+        # Check ALARM bit first (highest priority)
+        if chip_status & L1_CHIP_MODE_ALARM:
+            return DeviceMode.ALARM
+
+        # Check if chip is ready
+        if chip_status & L1_CHIP_MODE_READY:
+            # Check STARTUP bit to distinguish modes
+            if chip_status & L1_CHIP_MODE_STARTUP:
+                return DeviceMode.MAINTENANCE
+            else:
+                return DeviceMode.APPLICATION
+
+        # Chip is busy/not ready - default to application mode
+        return DeviceMode.APPLICATION
+
+    def _get_info(self, object_id: int, block_index: int = 0) -> bytes:
+        """
+        Send GET_INFO L2 request and return response data.
+
+        Args:
+            object_id: Object identifier to request
+            block_index: Block index for multi-block objects (certificates)
+
+        Returns:
+            Response data bytes
+        """
+        l2 = self._ensure_open()
+        # Build request data: [OBJECT_ID, BLOCK_INDEX]
+        request_data = bytes([object_id, block_index])
+        response = l2.send_receive(L2_GET_INFO_REQ_ID, request_data)
+        return response.data
 
     def get_chip_id(self) -> ChipId:
         """
@@ -199,7 +300,37 @@ class Tropic01:
 
         Maps to: lt_get_info_chip_id()
         """
-        raise NotImplementedError()
+        data = self._get_info(L2_GET_INFO_OBJECT_ID_CHIP_ID)
+
+        if len(data) < 128:
+            raise TropicError(ReturnCode.FAIL, f"Chip ID data too short: {len(data)} bytes")
+
+        # Parse CHIP_ID structure (128 bytes total)
+        # See lt_chip_id_t in libtropic_common.h
+        return ChipId(
+            chip_id_version=data[0:4],
+            fl_chip_info=data[4:20],
+            func_test_info=data[20:28],
+            silicon_rev=data[28:32].decode('ascii', errors='replace').rstrip('\x00'),
+            package_type_id=int.from_bytes(data[32:34], 'little'),
+            # rfu_1 at 34:36
+            provisioning_version=data[36],
+            fab_id=((data[37] & 0x0F) << 8) | data[38],  # 12 bits
+            short_part_number=((data[37] & 0xF0) >> 4) | (data[39] << 4),  # 12 bits
+            provisioning_date=data[40:42],
+            hsm_version=data[42:46],
+            programmer_version=data[46:50],
+            # rfu_2 at 50:52
+            serial_number=data[52:68],
+            part_number=data[68:84].decode('ascii', errors='replace').rstrip('\x00'),
+            prov_template_version=(data[84], data[85]),
+            prov_template_tag=data[86:90],
+            prov_spec_version=(data[90], data[91]),
+            prov_spec_tag=data[92:96],
+            batch_id=data[96:101],
+            # rfu_3 at 101:104
+            # rfu_4 at 104:128
+        )
 
     def get_riscv_firmware_version(self) -> FirmwareVersion:
         """
@@ -210,7 +341,23 @@ class Tropic01:
 
         Maps to: lt_get_info_riscv_fw_ver()
         """
-        raise NotImplementedError()
+        data = self._get_info(L2_GET_INFO_OBJECT_ID_RISCV_FW_VER)
+
+        if len(data) < 4:
+            raise TropicError(ReturnCode.FAIL, f"RISC-V FW version data too short: {len(data)} bytes")
+
+        # Version is 4 bytes: [major, minor, patch, build]
+        # Note: If in startup mode, highest bit is set
+        version = int.from_bytes(data[0:4], 'big')
+        is_bootloader = bool(version & 0x80000000)
+        version &= 0x7FFFFFFF  # Clear startup flag
+
+        return FirmwareVersion(
+            major=(version >> 24) & 0xFF,
+            minor=(version >> 16) & 0xFF,
+            patch=(version >> 8) & 0xFF,
+            build=version & 0xFF,
+        )
 
     def get_spect_firmware_version(self) -> FirmwareVersion:
         """
@@ -221,7 +368,22 @@ class Tropic01:
 
         Maps to: lt_get_info_spect_fw_ver()
         """
-        raise NotImplementedError()
+        data = self._get_info(L2_GET_INFO_OBJECT_ID_SPECT_FW_VER)
+
+        if len(data) < 4:
+            raise TropicError(ReturnCode.FAIL, f"SPECT FW version data too short: {len(data)} bytes")
+
+        # Version is 4 bytes: [major, minor, patch, build]
+        # Note: If in startup mode, this returns 0x80000000 (dummy value)
+        version = int.from_bytes(data[0:4], 'big')
+        version &= 0x7FFFFFFF  # Clear startup flag
+
+        return FirmwareVersion(
+            major=(version >> 24) & 0xFF,
+            minor=(version >> 16) & 0xFF,
+            patch=(version >> 8) & 0xFF,
+            build=version & 0xFF,
+        )
 
     def get_firmware_header(self, bank: FirmwareBank) -> FirmwareHeader:
         """
@@ -239,7 +401,44 @@ class Tropic01:
 
         Maps to: lt_get_info_fw_bank()
         """
-        raise NotImplementedError()
+        # Request FW bank header (bank ID is used as block_index)
+        data = self._get_info(L2_GET_INFO_OBJECT_ID_FW_BANK, block_index=int(bank))
+
+        if len(data) == 0:
+            # Empty bank
+            return FirmwareHeader(
+                fw_type=0,
+                version=0,
+                size=0,
+                git_hash=b'\x00' * 4,
+                content_hash=b'\x00' * 32,
+                header_version=0,
+            )
+
+        if len(data) == 20:
+            # Boot v1 header (20 bytes)
+            return FirmwareHeader(
+                fw_type=int.from_bytes(data[0:4], 'little'),
+                version=int.from_bytes(data[4:8], 'little'),
+                size=int.from_bytes(data[8:12], 'little'),
+                git_hash=data[12:16],
+                content_hash=data[16:20] + b'\x00' * 28,  # Only 4 bytes in v1
+                header_version=1,
+            )
+
+        if len(data) >= 52:
+            # Boot v2 header (52 bytes)
+            return FirmwareHeader(
+                fw_type=int.from_bytes(data[0:2], 'little'),
+                header_version=data[3],
+                version=int.from_bytes(data[4:8], 'little'),
+                size=int.from_bytes(data[8:12], 'little'),
+                git_hash=data[12:16],
+                content_hash=data[16:48],
+                pair_version=int.from_bytes(data[48:52], 'little'),
+            )
+
+        raise TropicError(ReturnCode.FAIL, f"Unexpected FW header size: {len(data)} bytes")
 
     def get_certificate_store(self) -> CertificateStore:
         """
@@ -253,7 +452,10 @@ class Tropic01:
 
         Maps to: lt_get_info_cert_store()
         """
-        raise NotImplementedError()
+        # TODO: Implement certificate store reading with proper ASN.1 parsing
+        # This requires reading multiple 128-byte blocks and parsing the
+        # certificate store header to determine certificate boundaries
+        raise NotImplementedError("Certificate store reading not yet implemented")
 
     def get_device_public_key(self) -> bytes:
         """
@@ -266,7 +468,8 @@ class Tropic01:
 
         Maps to: lt_get_st_pub()
         """
-        raise NotImplementedError()
+        # TODO: Implement by parsing device certificate from get_certificate_store()
+        raise NotImplementedError("Device public key extraction not yet implemented")
 
     # =========================================================================
     # Device Control
@@ -286,7 +489,35 @@ class Tropic01:
 
         Maps to: lt_reboot()
         """
-        raise NotImplementedError()
+        l2 = self._ensure_open()
+
+        # Map StartupMode enum to protocol constants
+        if mode == StartupMode.REBOOT:
+            startup_id = STARTUP_ID_REBOOT
+            expected_mode = DeviceMode.APPLICATION
+        else:
+            startup_id = STARTUP_ID_MAINTENANCE
+            expected_mode = DeviceMode.MAINTENANCE
+
+        # Mark that we're sending a startup request (for L2 erratum workaround)
+        l2.mark_startup_sent()
+
+        # Send STARTUP request
+        l2.send_receive(L2_STARTUP_REQ_ID, bytes([startup_id]))
+
+        # Clear session state (reboot invalidates session)
+        self._has_session = False
+
+        # Wait for device to reboot
+        self._transport.delay_ms(REBOOT_DELAY_MS)
+
+        # Verify device is in expected mode
+        actual_mode = self.mode
+        if actual_mode != expected_mode:
+            raise RebootError(
+                ReturnCode.REBOOT_UNSUCCESSFUL,
+                f"Expected {expected_mode.name}, got {actual_mode.name}"
+            )
 
     def sleep(self) -> None:
         """
@@ -296,7 +527,10 @@ class Tropic01:
 
         Maps to: lt_sleep()
         """
-        raise NotImplementedError()
+        l2 = self._ensure_open()
+
+        # Send SLEEP request with sleep kind
+        l2.send_receive(L2_SLEEP_REQ_ID, bytes([SLEEP_KIND_SLEEP]))
 
     # =========================================================================
     # Secure Session
@@ -326,7 +560,15 @@ class Tropic01:
 
         Maps to: lt_session_start()
         """
-        raise NotImplementedError()
+        # TODO: Implement secure session establishment with X25519 handshake
+        # This requires:
+        # 1. Generate ephemeral X25519 keypair
+        # 2. Send HANDSHAKE L2 request with ephemeral public key
+        # 3. Receive device ephemeral public key and auth tag
+        # 4. Derive session keys using HKDF
+        # 5. Verify auth tag
+        # 6. Store session keys for L3 encryption
+        raise NotImplementedError("Session start not yet implemented")
 
     def abort_session(self) -> None:
         """
@@ -337,7 +579,19 @@ class Tropic01:
 
         Maps to: lt_session_abort()
         """
-        raise NotImplementedError()
+        from ._protocol.constants import L2_SESSION_ABORT_REQ_ID
+
+        l2 = self._ensure_open()
+
+        # Only send abort if we think we have a session
+        if self._has_session:
+            try:
+                l2.send_receive(L2_SESSION_ABORT_REQ_ID, b"")
+            except Exception:
+                pass  # Ignore errors during abort
+
+        # Clear session state
+        self._has_session = False
 
     @property
     def has_session(self) -> bool:
@@ -363,7 +617,9 @@ class Tropic01:
 
         Maps to: lt_ping()
         """
-        raise NotImplementedError()
+        # TODO: Implement ping through L3 encrypted channel
+        # This requires an active session and L3 command encoding
+        raise NotImplementedError("Ping not yet implemented (requires session)")
 
     # =========================================================================
     # Logging (Debug)
@@ -385,7 +641,9 @@ class Tropic01:
 
         Maps to: lt_get_log_req()
         """
-        raise NotImplementedError()
+        l2 = self._ensure_open()
+        response = l2.send_receive(L2_GET_LOG_REQ_ID, b"")
+        return response.data
 
     # =========================================================================
     # Sub-modules (Lazy Initialization)
