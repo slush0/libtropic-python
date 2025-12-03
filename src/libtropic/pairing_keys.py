@@ -81,7 +81,32 @@ class PairingKeys:
 
         Maps to: lt_pairing_key_write()
         """
-        raise NotImplementedError()
+        from ._protocol.constants import L3_CMD_PAIRING_KEY_WRITE
+        from .enums import ReturnCode
+        from .exceptions import ParamError
+
+        slot_idx = int(slot)
+        if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Slot must be {self.SLOT_MIN}-{self.SLOT_MAX}, got {slot_idx}"
+            )
+
+        if len(public_key) != self.KEY_SIZE:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Public key must be {self.KEY_SIZE} bytes, got {len(public_key)}"
+            )
+
+        # Build command: slot(2B LE) + padding(1B) + pubkey(32B)
+        cmd_data = bytearray(35)  # 2 + 1 + 32
+        cmd_data[0] = slot_idx & 0xFF
+        cmd_data[1] = (slot_idx >> 8) & 0xFF
+        cmd_data[2] = 0  # padding
+        cmd_data[3:35] = public_key
+
+        # Send command - response is empty (just result code)
+        self._device._send_l3_command(L3_CMD_PAIRING_KEY_WRITE, bytes(cmd_data))
 
     def read(self, slot: int | PairingKeySlot) -> bytes:
         """
@@ -102,7 +127,26 @@ class PairingKeys:
 
         Maps to: lt_pairing_key_read()
         """
-        raise NotImplementedError()
+        from ._protocol.constants import L3_CMD_PAIRING_KEY_READ
+        from .enums import ReturnCode
+        from .exceptions import ParamError
+
+        slot_idx = int(slot)
+        if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Slot must be {self.SLOT_MIN}-{self.SLOT_MAX}, got {slot_idx}"
+            )
+
+        # Build command: slot(2B LE)
+        cmd_data = bytes([slot_idx & 0xFF, (slot_idx >> 8) & 0xFF])
+
+        # Send command and get response
+        # Response: padding(3B) + pubkey(32B)
+        response = self._device._send_l3_command(L3_CMD_PAIRING_KEY_READ, cmd_data)
+
+        # Skip 3 bytes padding, return public key
+        return response[3:35]
 
     def invalidate(self, slot: int | PairingKeySlot) -> None:
         """
@@ -125,7 +169,22 @@ class PairingKeys:
 
         Maps to: lt_pairing_key_invalidate()
         """
-        raise NotImplementedError()
+        from ._protocol.constants import L3_CMD_PAIRING_KEY_INVALIDATE
+        from .enums import ReturnCode
+        from .exceptions import ParamError
+
+        slot_idx = int(slot)
+        if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Slot must be {self.SLOT_MIN}-{self.SLOT_MAX}, got {slot_idx}"
+            )
+
+        # Build command: slot(2B LE)
+        cmd_data = bytes([slot_idx & 0xFF, (slot_idx >> 8) & 0xFF])
+
+        # Send command - response is empty (just result code)
+        self._device._send_l3_command(L3_CMD_PAIRING_KEY_INVALIDATE, cmd_data)
 
     def __getitem__(self, slot: int) -> bytes:
         """

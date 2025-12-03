@@ -101,7 +101,36 @@ class MacAndDestroy:
 
         Maps to: lt_mac_and_destroy()
         """
-        raise NotImplementedError()
+        from ._protocol.constants import L3_CMD_MAC_AND_DESTROY
+        from .enums import ReturnCode
+        from .exceptions import ParamError
+
+        slot_idx = int(slot)
+        if slot_idx < self.SLOT_MIN or slot_idx > self.SLOT_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Slot must be {self.SLOT_MIN}-{self.SLOT_MAX}, got {slot_idx}"
+            )
+
+        if len(data) != self.DATA_SIZE:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Data must be {self.DATA_SIZE} bytes, got {len(data)}"
+            )
+
+        # Build command: slot(2B LE) + padding(1B) + data_in(32B)
+        cmd_data = bytearray(35)  # 2 + 1 + 32
+        cmd_data[0] = slot_idx & 0xFF
+        cmd_data[1] = (slot_idx >> 8) & 0xFF
+        cmd_data[2] = 0  # padding
+        cmd_data[3:35] = data
+
+        # Send command and get response
+        # Response: padding(3B) + data_out(32B)
+        response = self._device._send_l3_command(L3_CMD_MAC_AND_DESTROY, bytes(cmd_data))
+
+        # Skip 3 bytes padding, return MAC result
+        return response[3:35]
 
     def __call__(
         self,

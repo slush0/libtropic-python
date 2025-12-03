@@ -44,6 +44,9 @@ class DataMemory:
         """
         self._device = device
 
+    # Maximum data size per slot (depends on FW version, use max)
+    DATA_SIZE_MAX = 475
+
     def write(self, slot: int, data: bytes) -> None:
         """
         Write data to memory slot.
@@ -53,7 +56,7 @@ class DataMemory:
 
         Args:
             slot: Slot index (0-511)
-            data: Data bytes to store
+            data: Data bytes to store (1-444 bytes)
 
         Raises:
             NoSessionError: If no secure session is active
@@ -65,7 +68,31 @@ class DataMemory:
 
         Maps to: lt_r_mem_data_write()
         """
-        raise NotImplementedError()
+        from .._protocol.constants import L3_CMD_R_MEM_DATA_WRITE
+        from ..enums import ReturnCode
+        from ..exceptions import ParamError
+
+        if slot < self.SLOT_MIN or slot > self.SLOT_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Slot must be {self.SLOT_MIN}-{self.SLOT_MAX}, got {slot}"
+            )
+
+        if len(data) < 1 or len(data) > self.DATA_SIZE_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Data must be 1-{self.DATA_SIZE_MAX} bytes, got {len(data)}"
+            )
+
+        # Build command: slot(2B LE) + padding(1B) + data(variable)
+        cmd_data = bytearray(3 + len(data))
+        cmd_data[0] = slot & 0xFF
+        cmd_data[1] = (slot >> 8) & 0xFF
+        cmd_data[2] = 0  # padding
+        cmd_data[3:] = data
+
+        # Send command - response is empty (just result code)
+        self._device._send_l3_command(L3_CMD_R_MEM_DATA_WRITE, bytes(cmd_data))
 
     def read(self, slot: int) -> bytes:
         """
@@ -87,7 +114,25 @@ class DataMemory:
 
         Maps to: lt_r_mem_data_read()
         """
-        raise NotImplementedError()
+        from .._protocol.constants import L3_CMD_R_MEM_DATA_READ
+        from ..enums import ReturnCode
+        from ..exceptions import ParamError
+
+        if slot < self.SLOT_MIN or slot > self.SLOT_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Slot must be {self.SLOT_MIN}-{self.SLOT_MAX}, got {slot}"
+            )
+
+        # Build command: slot(2B LE)
+        cmd_data = bytes([slot & 0xFF, (slot >> 8) & 0xFF])
+
+        # Send command and get response
+        # Response: padding(3B) + data(variable)
+        response = self._device._send_l3_command(L3_CMD_R_MEM_DATA_READ, cmd_data)
+
+        # Skip 3 bytes of padding, return data
+        return response[3:]
 
     def erase(self, slot: int) -> None:
         """
@@ -105,7 +150,21 @@ class DataMemory:
 
         Maps to: lt_r_mem_data_erase()
         """
-        raise NotImplementedError()
+        from .._protocol.constants import L3_CMD_R_MEM_DATA_ERASE
+        from ..enums import ReturnCode
+        from ..exceptions import ParamError
+
+        if slot < self.SLOT_MIN or slot > self.SLOT_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Slot must be {self.SLOT_MIN}-{self.SLOT_MAX}, got {slot}"
+            )
+
+        # Build command: slot(2B LE)
+        cmd_data = bytes([slot & 0xFF, (slot >> 8) & 0xFF])
+
+        # Send command - response is empty (just result code)
+        self._device._send_l3_command(L3_CMD_R_MEM_DATA_ERASE, cmd_data)
 
     def __getitem__(self, slot: int) -> bytes:
         """

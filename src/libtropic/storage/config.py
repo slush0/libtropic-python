@@ -74,7 +74,24 @@ class Configuration:
 
         Maps to: lt_r_config_read()
         """
-        raise NotImplementedError()
+        from .._protocol.constants import L3_CMD_R_CONFIG_READ
+
+        addr = int(address)
+
+        # Build command: address(2B LE)
+        cmd_data = bytes([addr & 0xFF, (addr >> 8) & 0xFF])
+
+        # Send command and get response
+        # Response: padding(3B) + value(4B LE)
+        response = self._device._send_l3_command(L3_CMD_R_CONFIG_READ, cmd_data)
+
+        # Parse value (skip 3 bytes padding)
+        value = (response[3] |
+                 (response[4] << 8) |
+                 (response[5] << 16) |
+                 (response[6] << 24))
+
+        return value
 
     def write_r(self, address: ConfigAddress, value: int) -> None:
         """
@@ -91,7 +108,22 @@ class Configuration:
 
         Maps to: lt_r_config_write()
         """
-        raise NotImplementedError()
+        from .._protocol.constants import L3_CMD_R_CONFIG_WRITE
+
+        addr = int(address)
+
+        # Build command: address(2B LE) + padding(1B) + value(4B LE)
+        cmd_data = bytearray(7)
+        cmd_data[0] = addr & 0xFF
+        cmd_data[1] = (addr >> 8) & 0xFF
+        cmd_data[2] = 0  # padding
+        cmd_data[3] = value & 0xFF
+        cmd_data[4] = (value >> 8) & 0xFF
+        cmd_data[5] = (value >> 16) & 0xFF
+        cmd_data[6] = (value >> 24) & 0xFF
+
+        # Send command - response is empty (just result code)
+        self._device._send_l3_command(L3_CMD_R_CONFIG_WRITE, bytes(cmd_data))
 
     def erase_r(self) -> None:
         """
@@ -105,16 +137,19 @@ class Configuration:
 
         Maps to: lt_r_config_erase()
         """
-        raise NotImplementedError()
+        from .._protocol.constants import L3_CMD_R_CONFIG_ERASE
 
-    def read_all_r(self) -> DeviceConfig:
+        # Send command - no data, response is empty (just result code)
+        self._device._send_l3_command(L3_CMD_R_CONFIG_ERASE, b"")
+
+    def read_all_r(self) -> dict[ConfigAddress, int]:
         """
         Read all R-Config objects.
 
         Convenience method that reads all configuration objects at once.
 
         Returns:
-            DeviceConfig containing all R-Config values
+            Dict mapping ConfigAddress to 32-bit values
 
         Raises:
             NoSessionError: If no secure session is active
@@ -122,16 +157,19 @@ class Configuration:
 
         Maps to: lt_read_whole_R_config()
         """
-        raise NotImplementedError()
+        result = {}
+        for addr in ConfigAddress:
+            result[addr] = self.read_r(addr)
+        return result
 
-    def write_all_r(self, config: DeviceConfig) -> None:
+    def write_all_r(self, config: dict[ConfigAddress, int]) -> None:
         """
         Write all R-Config objects.
 
         Convenience method that writes all configuration objects at once.
 
         Args:
-            config: DeviceConfig containing values to write
+            config: Dict mapping ConfigAddress to values to write
 
         Raises:
             NoSessionError: If no secure session is active
@@ -140,7 +178,8 @@ class Configuration:
 
         Maps to: lt_write_whole_R_config()
         """
-        raise NotImplementedError()
+        for addr, value in config.items():
+            self.write_r(addr, value)
 
     # =========================================================================
     # I-Config (Immutable)
@@ -162,7 +201,24 @@ class Configuration:
 
         Maps to: lt_i_config_read()
         """
-        raise NotImplementedError()
+        from .._protocol.constants import L3_CMD_I_CONFIG_READ
+
+        addr = int(address)
+
+        # Build command: address(2B LE)
+        cmd_data = bytes([addr & 0xFF, (addr >> 8) & 0xFF])
+
+        # Send command and get response
+        # Response: padding(3B) + value(4B LE)
+        response = self._device._send_l3_command(L3_CMD_I_CONFIG_READ, cmd_data)
+
+        # Parse value (skip 3 bytes padding)
+        value = (response[3] |
+                 (response[4] << 8) |
+                 (response[5] << 16) |
+                 (response[6] << 24))
+
+        return value
 
     def write_i_bit(self, address: ConfigAddress, bit_index: int) -> None:
         """
@@ -186,16 +242,39 @@ class Configuration:
 
         Maps to: lt_i_config_write()
         """
-        raise NotImplementedError()
+        from .._protocol.constants import L3_CMD_I_CONFIG_WRITE
+        from ..enums import ReturnCode
+        from ..exceptions import ParamError
 
-    def read_all_i(self) -> DeviceConfig:
+        if bit_index < 0 or bit_index > 31:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Bit index must be 0-31, got {bit_index}"
+            )
+
+        addr = int(address)
+
+        # Build command: address(2B LE) + padding(1B) + bit_index(4B LE)
+        cmd_data = bytearray(7)
+        cmd_data[0] = addr & 0xFF
+        cmd_data[1] = (addr >> 8) & 0xFF
+        cmd_data[2] = 0  # padding
+        cmd_data[3] = bit_index & 0xFF
+        cmd_data[4] = (bit_index >> 8) & 0xFF
+        cmd_data[5] = (bit_index >> 16) & 0xFF
+        cmd_data[6] = (bit_index >> 24) & 0xFF
+
+        # Send command - response is empty (just result code)
+        self._device._send_l3_command(L3_CMD_I_CONFIG_WRITE, bytes(cmd_data))
+
+    def read_all_i(self) -> dict[ConfigAddress, int]:
         """
         Read all I-Config objects.
 
         Convenience method that reads all I-Config values at once.
 
         Returns:
-            DeviceConfig containing all I-Config values
+            Dict mapping ConfigAddress to 32-bit values
 
         Raises:
             NoSessionError: If no secure session is active
@@ -203,9 +282,12 @@ class Configuration:
 
         Maps to: lt_read_whole_I_config()
         """
-        raise NotImplementedError()
+        result = {}
+        for addr in ConfigAddress:
+            result[addr] = self.read_i(addr)
+        return result
 
-    def write_all_i(self, config: DeviceConfig) -> None:
+    def write_all_i(self, config: dict[ConfigAddress, int]) -> None:
         """
         Write all I-Config objects (set 0-bits only).
 

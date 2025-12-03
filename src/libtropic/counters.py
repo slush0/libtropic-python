@@ -81,7 +81,35 @@ class MonotonicCounters:
 
         Maps to: lt_mcounter_init()
         """
-        raise NotImplementedError()
+        from ._protocol.constants import L3_CMD_MCOUNTER_INIT
+        from .enums import ReturnCode
+        from .exceptions import ParamError
+
+        idx = int(index)
+        if idx < self.INDEX_MIN or idx > self.INDEX_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Index must be {self.INDEX_MIN}-{self.INDEX_MAX}, got {idx}"
+            )
+
+        if value < 0 or value > self.VALUE_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Value must be 0-{self.VALUE_MAX}, got {value}"
+            )
+
+        # Build command: index(2B LE) + padding(1B) + value(4B LE)
+        cmd_data = bytearray(7)
+        cmd_data[0] = idx & 0xFF
+        cmd_data[1] = (idx >> 8) & 0xFF
+        cmd_data[2] = 0  # padding
+        cmd_data[3] = value & 0xFF
+        cmd_data[4] = (value >> 8) & 0xFF
+        cmd_data[5] = (value >> 16) & 0xFF
+        cmd_data[6] = (value >> 24) & 0xFF
+
+        # Send command - response is empty (just result code)
+        self._device._send_l3_command(L3_CMD_MCOUNTER_INIT, bytes(cmd_data))
 
     def update(self, index: int | McounterIndex) -> None:
         """
@@ -101,7 +129,22 @@ class MonotonicCounters:
 
         Maps to: lt_mcounter_update()
         """
-        raise NotImplementedError()
+        from ._protocol.constants import L3_CMD_MCOUNTER_UPDATE
+        from .enums import ReturnCode
+        from .exceptions import ParamError
+
+        idx = int(index)
+        if idx < self.INDEX_MIN or idx > self.INDEX_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Index must be {self.INDEX_MIN}-{self.INDEX_MAX}, got {idx}"
+            )
+
+        # Build command: index(2B LE)
+        cmd_data = bytes([idx & 0xFF, (idx >> 8) & 0xFF])
+
+        # Send command - response is empty (just result code)
+        self._device._send_l3_command(L3_CMD_MCOUNTER_UPDATE, cmd_data)
 
     def get(self, index: int | McounterIndex) -> int:
         """
@@ -121,7 +164,31 @@ class MonotonicCounters:
 
         Maps to: lt_mcounter_get()
         """
-        raise NotImplementedError()
+        from ._protocol.constants import L3_CMD_MCOUNTER_GET
+        from .enums import ReturnCode
+        from .exceptions import ParamError
+
+        idx = int(index)
+        if idx < self.INDEX_MIN or idx > self.INDEX_MAX:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Index must be {self.INDEX_MIN}-{self.INDEX_MAX}, got {idx}"
+            )
+
+        # Build command: index(2B LE)
+        cmd_data = bytes([idx & 0xFF, (idx >> 8) & 0xFF])
+
+        # Send command and get response
+        # Response: padding(3B) + value(4B LE)
+        response = self._device._send_l3_command(L3_CMD_MCOUNTER_GET, cmd_data)
+
+        # Parse value (skip 3 bytes padding)
+        value = (response[3] |
+                 (response[4] << 8) |
+                 (response[5] << 16) |
+                 (response[6] << 24))
+
+        return value
 
     def __getitem__(self, index: int) -> int:
         """

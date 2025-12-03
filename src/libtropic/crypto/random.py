@@ -55,7 +55,28 @@ class RandomGenerator:
 
         Maps to: lt_random_value_get()
         """
-        raise NotImplementedError()
+        from .._protocol.constants import L3_CMD_RANDOM_VALUE_GET
+        from ..enums import ReturnCode
+        from ..exceptions import ParamError
+
+        # Validate count (1-255)
+        if count < 1 or count > self.MAX_BYTES:
+            raise ParamError(
+                ReturnCode.PARAM_ERR,
+                f"Count must be 1-{self.MAX_BYTES}, got {count}"
+            )
+
+        # Build command data: n_bytes (1 byte)
+        cmd_data = bytes([count])
+
+        # Send L3 command and get response
+        # Response format: padding(3) + random_data(count)
+        response_data = self._device._send_l3_command(L3_CMD_RANDOM_VALUE_GET, cmd_data)
+
+        # Skip 3 bytes of padding, return random data
+        random_data = response_data[3:3 + count]
+
+        return random_data
 
     def __call__(self, count: int) -> bytes:
         """
