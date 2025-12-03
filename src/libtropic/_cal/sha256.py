@@ -5,6 +5,9 @@ Provides incremental SHA-256 hashing.
 Maps to: lt_sha256.h
 """
 
+import hashlib
+from typing import Optional
+
 # SHA-256 digest length in bytes
 DIGEST_LENGTH = 32
 
@@ -35,7 +38,7 @@ class Sha256Context:
 
         Maps to: lt_sha256_init()
         """
-        raise NotImplementedError()
+        self._hasher: Optional[hashlib._Hash] = None
 
     def start(self) -> None:
         """
@@ -46,7 +49,7 @@ class Sha256Context:
 
         Maps to: lt_sha256_start()
         """
-        raise NotImplementedError()
+        self._hasher = hashlib.sha256()
 
     def update(self, data: bytes) -> None:
         """
@@ -62,7 +65,9 @@ class Sha256Context:
 
         Maps to: lt_sha256_update()
         """
-        raise NotImplementedError()
+        if self._hasher is None:
+            raise RuntimeError("start() must be called before update()")
+        self._hasher.update(data)
 
     def finish(self) -> bytes:
         """
@@ -76,7 +81,9 @@ class Sha256Context:
 
         Maps to: lt_sha256_finish()
         """
-        raise NotImplementedError()
+        if self._hasher is None:
+            raise RuntimeError("start() must be called before finish()")
+        return self._hasher.digest()
 
 
 def sha256(data: bytes) -> bytes:
@@ -94,5 +101,4 @@ def sha256(data: bytes) -> bytes:
     Example:
         digest = sha256(b"Hello, World!")
     """
-    raise NotImplementedError()
-
+    return hashlib.sha256(data).digest()

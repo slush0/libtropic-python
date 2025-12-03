@@ -7,6 +7,10 @@ Maps to: lt_aesgcm.h
 
 from typing import Optional
 
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+from .memzero import secure_memzero
+
 # AES-GCM tag size used by TROPIC01 L3 protocol
 L3_TAG_SIZE = 16
 
@@ -40,7 +44,11 @@ class AesGcmEncryptContext:
 
         Maps to: lt_aesgcm_encrypt_init() if key provided
         """
-        raise NotImplementedError()
+        self._aesgcm: Optional[AESGCM] = None
+        self._key: Optional[bytearray] = None
+
+        if key is not None:
+            self.init(key)
 
     def init(self, key: bytes) -> None:
         """
@@ -55,7 +63,12 @@ class AesGcmEncryptContext:
 
         Maps to: lt_aesgcm_encrypt_init()
         """
-        raise NotImplementedError()
+        if len(key) not in (16, 24, 32):
+            raise ValueError(f"Invalid key length: {len(key)}. Must be 16, 24, or 32 bytes.")
+
+        # Store key in mutable buffer for secure clearing later
+        self._key = bytearray(key)
+        self._aesgcm = AESGCM(bytes(self._key))
 
     def encrypt(
         self,
@@ -80,7 +93,11 @@ class AesGcmEncryptContext:
 
         Maps to: lt_aesgcm_encrypt()
         """
-        raise NotImplementedError()
+        if self._aesgcm is None:
+            raise RuntimeError("Context not initialized. Call init() first.")
+
+        # cryptography library appends tag automatically
+        return self._aesgcm.encrypt(iv, plaintext, aad)
 
     def deinit(self) -> None:
         """
@@ -90,7 +107,10 @@ class AesGcmEncryptContext:
 
         Maps to: lt_aesgcm_encrypt_deinit()
         """
-        raise NotImplementedError()
+        if self._key is not None:
+            secure_memzero(self._key)
+            self._key = None
+        self._aesgcm = None
 
     def __enter__(self) -> 'AesGcmEncryptContext':
         """Context manager entry."""
@@ -130,7 +150,11 @@ class AesGcmDecryptContext:
 
         Maps to: lt_aesgcm_decrypt_init() if key provided
         """
-        raise NotImplementedError()
+        self._aesgcm: Optional[AESGCM] = None
+        self._key: Optional[bytearray] = None
+
+        if key is not None:
+            self.init(key)
 
     def init(self, key: bytes) -> None:
         """
@@ -145,7 +169,12 @@ class AesGcmDecryptContext:
 
         Maps to: lt_aesgcm_decrypt_init()
         """
-        raise NotImplementedError()
+        if len(key) not in (16, 24, 32):
+            raise ValueError(f"Invalid key length: {len(key)}. Must be 16, 24, or 32 bytes.")
+
+        # Store key in mutable buffer for secure clearing later
+        self._key = bytearray(key)
+        self._aesgcm = AESGCM(bytes(self._key))
 
     def decrypt(
         self,
@@ -170,7 +199,12 @@ class AesGcmDecryptContext:
 
         Maps to: lt_aesgcm_decrypt()
         """
-        raise NotImplementedError()
+        if self._aesgcm is None:
+            raise RuntimeError("Context not initialized. Call init() first.")
+
+        # cryptography library expects ciphertext with appended tag
+        # and raises InvalidTag on authentication failure
+        return self._aesgcm.decrypt(iv, ciphertext, aad)
 
     def deinit(self) -> None:
         """
@@ -180,7 +214,10 @@ class AesGcmDecryptContext:
 
         Maps to: lt_aesgcm_decrypt_deinit()
         """
-        raise NotImplementedError()
+        if self._key is not None:
+            secure_memzero(self._key)
+            self._key = None
+        self._aesgcm = None
 
     def __enter__(self) -> 'AesGcmDecryptContext':
         """Context manager entry."""
@@ -189,4 +226,3 @@ class AesGcmDecryptContext:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # type: ignore[no-untyped-def]
         """Context manager exit - ensures deinit is called."""
         self.deinit()
-

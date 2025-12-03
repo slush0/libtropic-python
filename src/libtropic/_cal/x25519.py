@@ -5,6 +5,11 @@ Provides X25519 key exchange operations using Curve25519.
 Maps to: lt_x25519.h
 """
 
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+    X25519PublicKey,
+)
+
 # X25519 key size in bytes
 KEY_SIZE = 32
 
@@ -44,7 +49,17 @@ def x25519(private_key: bytes, public_key: bytes) -> bytes:
 
     Maps to: lt_X25519()
     """
-    raise NotImplementedError()
+    if len(private_key) != KEY_SIZE:
+        raise ValueError(f"Invalid private key length: {len(private_key)}. Must be 32 bytes.")
+    if len(public_key) != KEY_SIZE:
+        raise ValueError(f"Invalid public key length: {len(public_key)}. Must be 32 bytes.")
+
+    # Load keys from raw bytes
+    priv = X25519PrivateKey.from_private_bytes(private_key)
+    pub = X25519PublicKey.from_public_bytes(public_key)
+
+    # Compute shared secret via ECDH
+    return priv.exchange(pub)
 
 
 def x25519_scalarmult_base(private_key: bytes) -> bytes:
@@ -69,5 +84,12 @@ def x25519_scalarmult_base(private_key: bytes) -> bytes:
 
     Maps to: lt_X25519_scalarmult()
     """
-    raise NotImplementedError()
+    if len(private_key) != KEY_SIZE:
+        raise ValueError(f"Invalid private key length: {len(private_key)}. Must be 32 bytes.")
 
+    # Load private key and derive public key
+    priv = X25519PrivateKey.from_private_bytes(private_key)
+    pub = priv.public_key()
+
+    # Return raw bytes of public key
+    return pub.public_bytes_raw()

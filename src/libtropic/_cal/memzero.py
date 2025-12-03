@@ -44,5 +44,9 @@ def secure_memzero(buffer: bytearray) -> None:
 
     Maps to: lt_secure_memzero()
     """
-    raise NotImplementedError()
+    if not isinstance(buffer, bytearray):
+        raise TypeError(f"Expected bytearray, got {type(buffer).__name__}")
 
+    # Zero each byte in the buffer
+    for i in range(len(buffer)):
+        buffer[i] = 0

@@ -5,6 +5,9 @@ Provides keyed-hash message authentication code using SHA-256.
 Maps to: lt_hmac_sha256.h
 """
 
+import hashlib
+import hmac
+
 # HMAC-SHA256 output length in bytes
 HASH_LENGTH = 32
 
@@ -33,5 +36,4 @@ def hmac_sha256(key: bytes, data: bytes) -> bytes:
 
     Maps to: lt_hmac_sha256()
     """
-    raise NotImplementedError()
-
+    return hmac.new(key, data, hashlib.sha256).digest()

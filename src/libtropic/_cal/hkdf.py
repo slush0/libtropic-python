@@ -10,6 +10,8 @@ not the full RFC 5869 HKDF.
 
 from typing import Tuple
 
+from .hmac_sha256 import hmac_sha256
+
 # HKDF output length (same as HMAC-SHA256)
 OUTPUT_LENGTH = 32
 
@@ -47,5 +49,11 @@ def hkdf(
 
     Maps to: lt_hkdf()
     """
-    raise NotImplementedError()
+    # Step 1: Extract - compute temporary key from chaining key and input
+    tmp = hmac_sha256(chaining_key, input_data)
 
+    # Step 2: Expand - derive output keys
+    output_1 = hmac_sha256(tmp, bytes([0x01]))
+    output_2 = hmac_sha256(tmp, output_1 + bytes([0x02]))
+
+    return output_1, output_2

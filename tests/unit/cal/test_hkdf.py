@@ -129,4 +129,3 @@ class TestHkdfLibtropicProtocol:
 
         # All outputs should be unique
         assert len({ck0.hex(), ck1.hex(), ck2.hex(), k1.hex(), k2.hex()}) == 5
-

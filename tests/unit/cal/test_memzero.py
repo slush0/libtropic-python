@@ -74,7 +74,7 @@ class TestSecureMemzeroUseCases:
     def test_clear_key_material(self) -> None:
         """Test clearing key material after use."""
         # Simulate key usage
-        key = bytearray(b"super_secret_key_12345678901234")
+        key = bytearray(b"super_secret_key_123456789012345")
         assert len(key) == 32
 
         # Use key for something...
@@ -106,4 +106,3 @@ class TestSecureMemzeroUseCases:
         # Clear after use
         secure_memzero(intermediate)
         assert all(b == 0 for b in intermediate)
-
