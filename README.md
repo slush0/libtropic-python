@@ -2,6 +2,11 @@
 
 Python bindings for the TROPIC01 secure element from [Tropic Square](https://tropicsquare.com).
 
+## ⚠️ Disclaimers
+
+- **SPI interface has not been tested** — the native Linux SPI transport is implemented but remains untested on real hardware.
+- **Limited test coverage** — not all test scenarios have been verified because the developer currently does not have access to a vanilla devkit device.
+
 ## Features
 
 - Full API coverage matching the official libtropic C SDK
@@ -31,16 +36,28 @@ pip install libtropic[all]
 
 ```python
 from libtropic import Tropic01, EccCurve
+from libtropic.keys import (
+    # For production TROPIC01 chips (most devices)
+    SH0_PRIV_PROD, SH0_PUB_PROD,
+    # For engineering sample TROPIC01-ES chips (pre-production)
+    SH0_PRIV_ENG_SAMPLE, SH0_PUB_ENG_SAMPLE,
+)
 
 with Tropic01("/dev/ttyACM0") as device:
     # Check device mode
     print(f"Device mode: {device.mode.name}")
 
+    # Get device public key (required for session handshake)
+    stpub = device.get_device_public_key()
+
     # Start secure session
+    # Use SH0_*_PROD keys for production chips (default)
+    # Use SH0_*_ENG_SAMPLE keys for engineering sample chips (TROPIC01-ES)
     device.start_session(
-        private_key=host_private_key,
-        public_key=host_public_key,
-        slot=0
+        stpub=stpub,
+        slot=0,
+        private_key=SH0_PRIV_PROD,
+        public_key=SH0_PUB_PROD,
     )
 
     # Generate ECC key
@@ -57,6 +74,7 @@ with Tropic01("/dev/ttyACM0") as device:
 
 ```python
 from libtropic import connect_spi
+from libtropic.keys import SH0_PRIV_PROD, SH0_PUB_PROD
 
 with connect_spi(
     spi_device="/dev/spidev0.0",
@@ -64,7 +82,13 @@ with connect_spi(
     cs_pin=8,
     int_pin=25  # optional
 ) as device:
-    device.start_session(private_key, public_key, slot=0)
+    stpub = device.get_device_public_key()
+    device.start_session(
+        stpub=stpub,
+        slot=0,
+        private_key=SH0_PRIV_PROD,
+        public_key=SH0_PUB_PROD,
+    )
     # ... use device
 ```
 
@@ -160,4 +184,3 @@ MIT License - see [LICENSE](LICENSE) for details.
 - [TROPIC01 Product Page](https://tropicsquare.com/tropic01)
 - [libtropic C SDK](https://github.com/tropicsquare/libtropic)
 - [Tropic Square](https://tropicsquare.com)
-
