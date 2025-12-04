@@ -71,7 +71,7 @@ with Tropic01("/dev/ttyACM0") as device:
     random_data = device.random.get_bytes(32)
 ```
 
-### Native SPI (Raspberry Pi, BeagleBone, etc.)
+### Native SPI (Raspberry Pi, etc.)
 
 ```python
 from libtropic import connect_spi

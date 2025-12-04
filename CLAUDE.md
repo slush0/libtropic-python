@@ -8,6 +8,7 @@
 - API mirrors libtropic C — same functions, Pythonic naming
 - Tests mirror C tests — port all from `libtropic-upstream/`
 - No feature creep — if not in C lib, out of scope
+- **Document all differences** — any C↔Python deviation MUST be in `PARITY.md`
 
 ### Development Discipline
 1. **Minimal changes** — implement ONLY what's requested, no "improvements"
