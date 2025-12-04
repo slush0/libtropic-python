@@ -1057,28 +1057,53 @@ class Tropic01:
         private_key: bytes,
         public_key: bytes,
         slot: int | PairingKeySlot = 0,
+        root_ca: bytes | None = None,
+        skip_verification: bool = False,
     ) -> None:
         """
-        Verify device certificate and establish secure session.
+        Verify device certificate chain and establish secure session.
 
-        High-level helper that automatically fetches the device's static
-        public key from the certificate store before starting the session.
-        This is the recommended way to start a session for most use cases.
+        Validates the complete X.509 certificate chain from the device
+        up to the trusted Tropic Square root CA, then establishes an
+        encrypted session. This is the recommended way to start a session.
+
+        Certificate chain verified:
+            Root CA (trusted) → TROPIC01 CA → XXXX CA → Device Cert
+
+        Note:
+            Unlike the C library (lt_verify_chip_and_start_secure_session),
+            this Python implementation performs full certificate chain
+            verification. The C library only extracts STpub without verification.
 
         Args:
             private_key: 32-byte X25519 host private key (SH_priv)
             public_key: 32-byte X25519 host public key (SH_pub)
             slot: Pairing key slot index (0-3) where host public_key is stored
+            root_ca: Optional DER-encoded trusted root CA certificate.
+                    If None, uses embedded Tropic Square root CA.
+            skip_verification: If True, skip certificate verification (NOT
+                              recommended for production - for development only)
 
         Raises:
+            CertificateVerificationError: If certificate chain verification fails
             ParamError: If keys are invalid or slot out of range
             HandshakeError: If key exchange fails
             AuthenticationError: If device authentication tag verification fails
             TropicError: If certificate store cannot be read
 
         Maps to: lt_verify_chip_and_start_secure_session(h, shipriv, shipub, pkey_index)
+                 (with additional certificate verification)
         """
-        # Get device's static public key from certificate store
+        from ._cert import verify_certificate_chain
+
+        # Get certificate store from device
+        cert_store = self.get_certificate_store()
+
+        # Verify certificate chain (unless explicitly skipped)
+        if not skip_verification:
+            verify_certificate_chain(cert_store, root_ca)
+
+        # Extract device's static public key from certificate
         stpub = self.get_device_public_key()
 
         # Start session with all parameters

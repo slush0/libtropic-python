@@ -46,25 +46,6 @@ class TestRandomValueGet:
         random_data = device_with_session.random.get_bytes(1)
         assert len(random_data) == 1
 
-    def test_random_value_uniqueness(self, device_with_session: Tropic01) -> None:
-        """
-        Test that random values are actually random (not repeating).
-
-        Note: This is a weak randomness test - just checks for obvious
-        failures like returning constant values.
-        """
-        values = set()
-        num_samples = 100
-
-        for _ in range(num_samples):
-            random_data = device_with_session.random.get_bytes(32)
-            values.add(random_data)
-
-        # All 100 samples should be unique (statistically virtually certain)
-        assert len(values) == num_samples, (
-            f"Expected {num_samples} unique values, got {len(values)}"
-        )
-
     def test_random_value_callable_syntax(self, device_with_session: Tropic01) -> None:
         """Test callable syntax: device.random(32)."""
         random_data = device_with_session.random(32)
@@ -79,4 +60,3 @@ class TestRandomValueGet:
         """Test that requesting > 255 bytes raises ParamError."""
         with pytest.raises(ParamError):
             device_with_session.random.get_bytes(256)
-

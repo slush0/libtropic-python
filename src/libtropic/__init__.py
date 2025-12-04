@@ -51,6 +51,7 @@ from .enums import (
 from .exceptions import (
     AuthenticationError,
     CertificateError,
+    CertificateVerificationError,
     ConnectionError,
     CounterInvalidError,
     CrcError,
@@ -215,6 +216,7 @@ __all__ = [
     "AuthenticationError",
     "CrcError",
     "CertificateError",
+    "CertificateVerificationError",
     "RebootError",
     "TransportError",
     "TimeoutError",

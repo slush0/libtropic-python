@@ -128,6 +128,27 @@ class CertificateError(TropicError):
     """Raised for certificate store or validation errors."""
 
 
+class CertificateVerificationError(Exception):
+    """
+    Raised when certificate chain verification fails.
+
+    This is separate from TropicError as certificate verification is a
+    Python-specific feature not present in the C library.
+
+    Attributes:
+        reason: Human-readable description of the failure
+        details: Additional context about the error
+    """
+
+    def __init__(self, reason: str, details: str = ""):
+        self.reason = reason
+        self.details = details
+        message = reason
+        if details:
+            message = f"{reason}: {details}"
+        super().__init__(message)
+
+
 class RebootError(TropicError):
     """Raised when reboot to requested mode fails."""
 
