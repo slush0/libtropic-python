@@ -60,4 +60,3 @@ __all__ = [
     # Memory
     "secure_memzero",
 ]
-

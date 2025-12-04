@@ -361,9 +361,8 @@ class LinuxSpiTransport(Transport):
                 self._int_line.read_edge_events()
                 # We got a rising edge
                 return True
-            else:
-                # Timeout
-                return False
+            # Timeout
+            return False
 
         except Exception as e:
             raise OSError(f"Failed to wait for interrupt: {e}") from e

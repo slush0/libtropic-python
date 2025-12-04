@@ -61,17 +61,14 @@ if TYPE_CHECKING:
 
 class L3Error(Exception):
     """Base exception for L3 layer errors."""
-    pass
 
 
 class L3NonceOverflowError(L3Error):
     """IV/nonce counter overflow (would wrap to zero)."""
-    pass
 
 
 class L3ResponseSizeError(L3Error):
     """Invalid response size."""
-    pass
 
 
 class L3ResultError(L3Error):

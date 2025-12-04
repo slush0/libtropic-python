@@ -62,92 +62,74 @@ class TropicError(Exception):
 
 class NoSessionError(TropicError):
     """Raised when operation requires an active secure session but none exists."""
-    pass
 
 
 class ParamError(TropicError):
     """Raised for invalid parameter values."""
-    pass
 
 
 class CryptoError(TropicError):
     """Raised for cryptographic operation failures."""
-    pass
 
 
 class DeviceAlarmError(TropicError):
     """Raised when device enters alarm mode (security event)."""
-    pass
 
 
 class UnauthorizedError(TropicError):
     """Raised when operation is not permitted (insufficient privileges)."""
-    pass
 
 
 class SlotError(TropicError):
     """Base class for slot-related errors."""
-    pass
 
 
 class SlotEmptyError(SlotError):
     """Raised when accessing an empty slot that should contain data."""
-    pass
 
 
 class SlotNotEmptyError(SlotError):
     """Raised when writing to a slot that already contains data."""
-    pass
 
 
 class SlotExpiredError(SlotError):
     """Raised when accessing an expired flash slot."""
-    pass
 
 
 class SlotInvalidError(SlotError):
     """Raised when slot content is invalidated."""
-    pass
 
 
 class InvalidKeyError(TropicError):
     """Raised when key in slot is invalid or corrupted."""
-    pass
 
 
 class CounterInvalidError(TropicError):
     """Raised when monotonic counter is disabled, locked, or at zero."""
-    pass
 
 
 class HardwareError(TropicError):
     """Raised when a hardware error occurs during write operation."""
-    pass
 
 
 class HandshakeError(TropicError):
     """Raised when secure session handshake fails."""
-    pass
 
 
 class AuthenticationError(TropicError):
     """Raised when message authentication (MAC/tag) fails."""
-    pass
 
 
 class CrcError(TropicError):
     """Raised when CRC check fails on communication."""
-    pass
 
 
 class CertificateError(TropicError):
     """Raised for certificate store or validation errors."""
-    pass
 
 
 class RebootError(TropicError):
     """Raised when reboot to requested mode fails."""
-    pass
 
 
 class TransportError(Exception):
@@ -156,14 +138,11 @@ class TransportError(Exception):
 
     This is separate from TropicError as it's not a device-level error.
     """
-    pass
 
 
 class TimeoutError(TransportError):
     """Raised when transport operation times out."""
-    pass
 
 
 class ConnectionError(TransportError):
     """Raised when transport connection fails."""
-    pass

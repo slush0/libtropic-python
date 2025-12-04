@@ -48,5 +48,5 @@ def secure_memzero(buffer: bytearray) -> None:
         raise TypeError(f"Expected bytearray, got {type(buffer).__name__}")
 
     # Zero each byte in the buffer
-    for i in range(len(buffer)):
+    for i, _ in enumerate(buffer):
         buffer[i] = 0

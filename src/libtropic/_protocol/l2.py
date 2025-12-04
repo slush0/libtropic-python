@@ -51,12 +51,10 @@ class L2FrameStatus(IntEnum):
 
 class L2Error(Exception):
     """Base exception for L2 layer errors."""
-    pass
 
 
 class L2CrcError(L2Error):
     """CRC error in received frame."""
-    pass
 
 
 class L2StatusError(L2Error):
@@ -68,7 +66,6 @@ class L2StatusError(L2Error):
 
 class L2LengthError(L2Error):
     """Invalid response length."""
-    pass
 
 
 @dataclass

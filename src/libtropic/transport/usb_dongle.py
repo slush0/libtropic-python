@@ -184,7 +184,6 @@ class UsbDongleTransport(Transport):
         Note: For USB dongle, CS goes low automatically when SPI transfer starts.
         This is a no-op.
         """
-        pass  # CS LOW is handled automatically during SPI transfer
 
     def cs_high(self) -> None:
         """

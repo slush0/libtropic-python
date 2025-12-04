@@ -376,7 +376,7 @@ class Tropic01:
             if ack_response.status == L2FrameStatus.REQUEST_CONT:
                 # More chunks expected - continue sending
                 continue
-            elif ack_response.status == L2FrameStatus.REQUEST_OK:
+            if ack_response.status == L2FrameStatus.REQUEST_OK:
                 # All chunks sent, command accepted
                 break
             elif ack_response.status == L2FrameStatus.RESULT_OK:
@@ -405,7 +405,7 @@ class Tropic01:
                 # More response chunks coming
                 response_chunks.append(result_response.data)
                 continue
-            elif result_response.status == L2FrameStatus.RESULT_OK:
+            if result_response.status == L2FrameStatus.RESULT_OK:
                 # Final response chunk
                 response_chunks.append(result_response.data)
                 break
@@ -420,7 +420,7 @@ class Tropic01:
 
         # Decrypt response
         try:
-            result_code, decrypted_data = decrypt_response(session, response_data)
+            _result_code, decrypted_data = decrypt_response(session, response_data)
         except L3ResultError as e:
             # Convert L3 result error to appropriate exception type
             raise result_code_to_exception(e.result_code) from e
@@ -456,8 +456,7 @@ class Tropic01:
             # Check STARTUP bit to distinguish modes
             if chip_status & L1_CHIP_MODE_STARTUP:
                 return DeviceMode.MAINTENANCE
-            else:
-                return DeviceMode.APPLICATION
+            return DeviceMode.APPLICATION
 
         # Chip is busy/not ready - default to application mode
         return DeviceMode.APPLICATION

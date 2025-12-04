@@ -24,27 +24,22 @@ if TYPE_CHECKING:
 
 class L1Error(Exception):
     """Base exception for L1 layer errors."""
-    pass
 
 
 class L1ChipBusyError(L1Error):
     """Chip is busy and not responding after max retries."""
-    pass
 
 
 class L1ChipAlarmError(L1Error):
     """Chip is in ALARM mode."""
-    pass
 
 
 class L1DataLengthError(L1Error):
     """Invalid data length in response."""
-    pass
 
 
 class L1SpiError(L1Error):
     """SPI communication error."""
-    pass
 
 
 class L1Layer:
@@ -165,12 +160,11 @@ class L1Layer:
                 total_len = 3 + remaining
                 return bytes(self._buffer[:total_len])
 
-            else:
-                # Chip not ready - release CS and retry after delay
-                self._transport.cs_high()
+            # Chip not ready - release CS and retry after delay
+            self._transport.cs_high()
 
-                # Use longer delay if in startup mode (no INT pin)
-                self._transport.delay_ms(L1_READ_RETRY_DELAY_MS)
+            # Use longer delay if in startup mode (no INT pin)
+            self._transport.delay_ms(L1_READ_RETRY_DELAY_MS)
 
         raise L1ChipBusyError(f"Chip busy after {L1_READ_MAX_TRIES} retries")
 

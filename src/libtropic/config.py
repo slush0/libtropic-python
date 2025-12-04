@@ -314,6 +314,6 @@ class Configuration:
             # For each bit position (0-31), if the bit is 0 in the config value,
             # write it to I-Config (irreversible transition from 1 to 0)
             for bit_index in range(32):
-                if not (value & (1 << bit_index)):
+                if not value & (1 << bit_index):
                     # Bit is 0 - write it to I-Config
                     self.write_i_bit(addr, bit_index)
