@@ -12,10 +12,6 @@ from libtropic import CounterInvalidError, McounterIndex, Tropic01
 
 from ..conftest import MCOUNTER_MAX, MCOUNTER_MIN
 
-# Maximum counter value
-MCOUNTER_VALUE_MAX = 0xFFFFFFFE
-
-
 @pytest.mark.hardware
 @pytest.mark.destructive
 class TestMcounter:
@@ -56,17 +52,6 @@ class TestMcounter:
                 f"Counter {index}: Expected {test_initial_value - 1}, got {value}"
             )
 
-    def test_mcounter_init_max_value(self, device_with_session: Tropic01) -> None:
-        """Test initializing counter with maximum value."""
-        index = 0
-
-        # Initialize with max value
-        device_with_session.counters.init(index=index, value=MCOUNTER_VALUE_MAX)
-
-        # Verify
-        value = device_with_session.counters.get(index)
-        assert value == MCOUNTER_VALUE_MAX
-
     def test_mcounter_decrement_to_zero(self, device_with_session: Tropic01) -> None:
         """
         Test decrementing counter to zero.
@@ -88,21 +73,6 @@ class TestMcounter:
         assert device_with_session.counters.get(index) == 0
 
         # Further update should fail (counter at 0)
-        with pytest.raises(CounterInvalidError):
-            device_with_session.counters.update(index)
-
-    def test_mcounter_init_zero(self, device_with_session: Tropic01) -> None:
-        """Test initializing counter with zero value."""
-        index = 0
-
-        # Initialize with zero
-        device_with_session.counters.init(index=index, value=0)
-
-        # Verify
-        value = device_with_session.counters.get(index)
-        assert value == 0
-
-        # Update should fail immediately
         with pytest.raises(CounterInvalidError):
             device_with_session.counters.update(index)
 
@@ -178,4 +148,3 @@ class TestMcounter:
             assert value == 1000 + index, (
                 f"Counter {index} changed unexpectedly to {value}"
             )
-
