@@ -17,7 +17,7 @@ device.get_device_public_key()        → lt_get_st_pub()
 
 device.start_session(...)             → lt_session_start()
 device.abort_session()                → lt_session_abort()
-device.verify_chip_and_start_session()→ lt_verify_chip_and_start_secure_session()
+device.verify_chip_and_start_session()→ lt_verify_chip_and_start_secure_session() [with cert verification]
 
 device.reboot(mode)                   → lt_reboot()
 device.sleep()                        → lt_sleep()
@@ -107,12 +107,63 @@ TropicError           # Base (LT_FAIL)
 ├── CrcError          # LT_L2_CRC_ERR
 ├── CertificateError  # LT_CERT_*
 └── RebootError       # LT_REBOOT_UNSUCCESSFUL
+
+CertificateVerificationError  # Python-only (cert chain verification)
 ```
 
 ### Transport Layer
 
 - **C**: Compile-time HAL selection (`hal/posix/`, `hal/linux/`)
 - **Python**: Runtime selection via `UsbDongleTransport` or `LinuxSpiTransport`
+
+### Certificate Chain Verification
+
+**Critical difference**: Python implements full X.509 certificate chain verification
+while the C library does not.
+
+| Aspect | C Library | Python Library |
+|--------|-----------|----------------|
+| Verification | **None** — only extracts STpub | Full chain validation |
+| Root CA | N/A | Embedded Tropic Square root CA |
+| Chain checked | N/A | Root CA → TROPIC01 CA → XXXX CA → Device |
+| Exception | N/A | `CertificateVerificationError` |
+
+```python
+# Python verifies the entire certificate chain by default
+device.verify_chip_and_start_session(
+    private_key=priv,
+    public_key=pub,
+    slot=0,
+    root_ca=custom_root_ca,      # Optional: override embedded root CA
+    skip_verification=False,     # Default: verify chain (set True for dev only)
+)
+```
+
+The C library explicitly states in `libtropic.h` (lines 701-705):
+> *"This function currently DOES NOT validate/verify the whole certificate chain,
+> it just parses out STPUB from the device's certificate."*
+
+**Root CA Certificate Discrepancy**:
+
+| Source | Certificate | CN | Size |
+|--------|------------|-----|------|
+| libtropic-python (embedded) | **Production** | `Tropic Square Root CA v1` | 604 bytes |
+| libtropic-upstream | TEST | `Tropic Square TEST Root CA v1` | 613 bytes |
+
+The Python library embeds the **production** root CA by default. Devices provisioned
+with test/lab batch certificates (from libtropic-upstream) will fail verification
+unless you provide the TEST root CA via the `root_ca` parameter:
+
+```python
+# For lab batch devices using TEST certificates
+TEST_ROOT_CA = open("path/to/test_root_ca.der", "rb").read()
+device.verify_chip_and_start_session(
+    private_key=priv,
+    public_key=pub,
+    slot=0,
+    root_ca=TEST_ROOT_CA,
+)
+```
 
 ### Default Pairing Keys
 
