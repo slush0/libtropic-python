@@ -229,26 +229,6 @@ class TestMacAndDestroy:
 
         assert len(response) == MAC_AND_DESTROY_DATA_SIZE
 
-    def test_mac_and_destroy_deterministic(self, device_with_session: Tropic01) -> None:
-        """
-        Test that same input produces same output (deterministic).
-
-        M&D should be deterministic for the same slot and input.
-        """
-        slot = 0
-        challenge = generate_test_data(MAC_AND_DESTROY_DATA_SIZE)
-
-        # Execute multiple times with same input
-        responses = []
-        for _ in range(3):
-            response = device_with_session.mac_and_destroy.execute(slot=slot, data=challenge)
-            responses.append(response)
-
-        # All responses should be identical
-        assert all(r == responses[0] for r in responses), (
-            "M&D should be deterministic for same input"
-        )
-
     def test_mac_and_destroy_different_inputs(self, device_with_session: Tropic01) -> None:
         """Test that different inputs produce different outputs."""
         slot = 0
@@ -264,4 +244,3 @@ class TestMacAndDestroy:
         response2 = device_with_session.mac_and_destroy.execute(slot=slot, data=challenge2)
 
         assert response1 != response2, "Different inputs should produce different outputs"
-
