@@ -22,6 +22,10 @@ Python SDK for the TROPIC01 secure element from [Tropic Square](https://tropicsq
 ## Installation
 
 ```bash
+# Virtual environment preparation
+pip -m venv .venv
+source .venv/bin/activate
+
 # Basic installation
 pip install git+https://github.com/slush0/libtropic-python.git
 
@@ -33,6 +37,9 @@ pip install "libtropic[spi] @ git+https://github.com/slush0/libtropic-python.git
 
 # All transports
 pip install "libtropic[all] @ git+https://github.com/slush0/libtropic-python.git"
+
+# For local development
+pip install ".[all]"
 ```
 
 ## Quick Start
