@@ -87,8 +87,8 @@ from libtropic.keys import SH0_PRIV_PROD, SH0_PUB_PROD
 with connect_spi(
     spi_device="/dev/spidev0.0",
     gpio_chip="/dev/gpiochip0",
-    cs_pin=8,
-    int_pin=25  # optional
+    cs_pin=25,
+    int_pin=5  # optional
 ) as device:
     device.verify_chip_and_start_session(
         private_key=SH0_PRIV_PROD,
