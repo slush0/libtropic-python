@@ -27,7 +27,8 @@ Environment Variables:
 
     Key configuration:
         - LIBTROPIC_KEY_CONFIG: Key configuration to use:
-            - "engineering" (default): Engineering sample keys at slot 0
+            - "production" (default): Production keys at slot 0
+            - "engineering": Engineering sample keys at slot 0
             - "hwwallet": Hardware wallet example keys at slot 1
 
     Test control:
@@ -53,6 +54,7 @@ from libtropic import (
     UsbDongleConfig,
     UsbDongleTransport,
 )
+from libtropic.keys import SH0_PRIV_PROD, SH0_PUB_PROD
 
 # =============================================================================
 # Test Configuration
@@ -122,8 +124,17 @@ class KeyConfig:
     slot: PairingKeySlot
 
 
+# Production keys (SH0) - from libtropic_default_sh0_keys.c
+# Used on production TROPIC01 devices (default for most devices)
+KEY_CONFIG_PRODUCTION = KeyConfig(
+    name="production",
+    private_key=SH0_PRIV_PROD,
+    public_key=SH0_PUB_PROD,
+    slot=PairingKeySlot.SLOT_0,
+)
+
 # Engineering sample keys (SH0) - from libtropic_default_sh0_keys.c
-# Used on fresh/virgin TROPIC01 devices
+# Used on fresh/virgin TROPIC01-ES (pre-production) devices
 KEY_CONFIG_ENGINEERING = KeyConfig(
     name="engineering",
     private_key=bytes.fromhex(
@@ -154,6 +165,7 @@ KEY_CONFIG_HWWALLET = KeyConfig(
 
 # Map of available key configurations
 KEY_CONFIGS = {
+    "production": KEY_CONFIG_PRODUCTION,
     "engineering": KEY_CONFIG_ENGINEERING,
     "hwwallet": KEY_CONFIG_HWWALLET,
 }
@@ -161,7 +173,7 @@ KEY_CONFIGS = {
 
 def get_key_config() -> KeyConfig:
     """Get the active key configuration from environment variable."""
-    config_name = os.environ.get("LIBTROPIC_KEY_CONFIG", "engineering").lower()
+    config_name = os.environ.get("LIBTROPIC_KEY_CONFIG", "production").lower()
     if config_name not in KEY_CONFIGS:
         valid_options = ", ".join(KEY_CONFIGS.keys())
         raise ValueError(
@@ -171,10 +183,10 @@ def get_key_config() -> KeyConfig:
     return KEY_CONFIGS[config_name]
 
 
-# Legacy exports for backward compatibility (use engineering keys by default)
+# Legacy exports for backward compatibility (use production keys by default)
 # Tests should use the key_config fixture instead for dynamic configuration
-TEST_SH0_PRIV = KEY_CONFIG_ENGINEERING.private_key
-TEST_SH0_PUB = KEY_CONFIG_ENGINEERING.public_key
+TEST_SH0_PRIV = KEY_CONFIG_PRODUCTION.private_key
+TEST_SH0_PUB = KEY_CONFIG_PRODUCTION.public_key
 
 # Limits from TROPIC01 specification
 ECC_SLOT_MIN = 0
@@ -241,7 +253,7 @@ def key_config() -> KeyConfig:
         KeyConfig with private_key, public_key, and slot fields.
 
     Environment Variable:
-        LIBTROPIC_KEY_CONFIG: "engineering" (default) or "hwwallet"
+        LIBTROPIC_KEY_CONFIG: "production" (default), "engineering", or "hwwallet"
     """
     return get_key_config()
 
@@ -271,7 +283,8 @@ def device_with_session(key_config: KeyConfig) -> Generator[Tropic01, None, None
     Transport is selected via LIBTROPIC_TRANSPORT env var ("usb" or "spi").
 
     Uses keys configured via LIBTROPIC_KEY_CONFIG environment variable:
-        - "engineering": Engineering sample keys at slot 0 (default)
+        - "production": Production keys at slot 0 (default)
+        - "engineering": Engineering sample keys at slot 0
         - "hwwallet": Hardware wallet example keys at slot 1
 
     Use for tests that require L3 (session-protected) operations.

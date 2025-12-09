@@ -167,7 +167,7 @@ class TestDeviceHandshake:
 
 # TEST Root CA from libtropic-upstream (CN=Tropic Square TEST Root CA v1)
 # Size: 613 bytes
-# This differs from the production root CA (604 bytes) embedded in the library
+# Note: This matches the root CA now embedded in the library (sourced from libtropic-upstream)
 TEST_ROOT_CA_DER = bytes([
     0x30, 0x82, 0x02, 0x61, 0x30, 0x82, 0x01, 0xc4, 0xa0, 0x03, 0x02, 0x01,
     0x02, 0x02, 0x01, 0x65, 0x30, 0x0a, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce,

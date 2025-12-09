@@ -15,7 +15,7 @@
 #   LIBTROPIC_GPIO_CHIP    - GPIO chip device (default: /dev/gpiochip0)
 #   LIBTROPIC_CS_PIN       - GPIO pin for chip select (default: 8)
 #   LIBTROPIC_INT_PIN      - GPIO pin for interrupt (optional)
-#   LIBTROPIC_KEY_CONFIG   - Key config: "engineering" or "hwwallet" (default: engineering)
+#   LIBTROPIC_KEY_CONFIG   - Key config: "production", "engineering", or "hwwallet" (default: production)
 #
 
 set -e
@@ -52,9 +52,9 @@ export LIBTROPIC_CS_PIN="${LIBTROPIC_CS_PIN:-8}"
 # Enable destructive tests (modify device state, but reversible)
 export LIBTROPIC_RUN_DESTRUCTIVE=1
 
-# Key configuration (default: engineering)
-# Options: "engineering" (slot 0) or "hwwallet" (slot 1)
-export LIBTROPIC_KEY_CONFIG="${LIBTROPIC_KEY_CONFIG:-engineering}"
+# Key configuration (default: production)
+# Options: "production" (slot 0), "engineering" (slot 0), or "hwwallet" (slot 1)
+#export LIBTROPIC_KEY_CONFIG="${LIBTROPIC_KEY_CONFIG:-production}"
 
 # =============================================================================
 # Run Tests

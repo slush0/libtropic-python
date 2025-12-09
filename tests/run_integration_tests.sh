@@ -11,13 +11,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# FIXME This is for device already modified by hwwallet example from libtropic
-export LIBTROPIC_KEY_CONFIG="hwwallet"
-
 # Run functional tests with destructive enabled, but NOT irreversible
 # This will skip tests marked @pytest.mark.irreversible
 export LIBTROPIC_RUN_DESTRUCTIVE=1
 export LIBTROPIC_DEVICE=/dev/ttyACM0
+
+#export LIBTROPIC_KEY_CONFIG="hwwallet"
 
 cd "$PROJECT_ROOT"
 
@@ -37,4 +36,3 @@ python -m pytest \
 
 echo ""
 echo "=== Integration Tests Complete ==="
-
