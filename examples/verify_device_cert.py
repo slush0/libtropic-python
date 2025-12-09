@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""
+TROPIC01 Device Certificate Verification Example
+
+This example demonstrates how to verify a TROPIC01 device's certificate chain:
+
+1. Open connection to the device
+2. Attempt to verify certificate chain and start secure session
+3. Display verification result (valid or invalid)
+4. Show certificate details if verification succeeds
+
+The certificate chain is verified:
+    Root CA (trusted) → TROPIC01 CA → XXXX CA → Device Cert
+
+Usage:
+    python examples/verify_device_cert.py --port /dev/ttyACM0
+
+Optional arguments:
+    --root-ca PATH    Path to custom root CA certificate (DER format)
+    --skip-verify    Skip certificate verification (for development only)
+"""
+
+import argparse
+import logging
+import sys
+import warnings
+
+from libtropic import Tropic01
+from libtropic.enums import PairingKeySlot
+from libtropic.exceptions import CertificateVerificationError
+from libtropic.keys import SH0_PRIV_PROD, SH0_PUB_PROD
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+
+def format_trusted_root_ca(root_ca_bytes: bytes, source: str) -> None:
+    """Format and display trusted root CA certificate information."""
+    from cryptography import x509
+
+    log.info("Trusted Root CA Certificate:")
+    log.info("  " + "-" * 60)
+    log.info("  Source: %s", source)
+
+    try:
+        root_ca = x509.load_der_x509_certificate(root_ca_bytes)
+        log.info("  Subject: %s", root_ca.subject.rfc4514_string())
+        log.info("  Issuer:  %s", root_ca.issuer.rfc4514_string())
+        log.info("  Serial:  %s", hex(root_ca.serial_number))
+        log.info("  Valid from: %s", root_ca.not_valid_before_utc)
+        log.info("  Valid to:   %s", root_ca.not_valid_after_utc)
+        log.info("  Size:    %d bytes", len(root_ca_bytes))
+    except Exception as e:
+        log.warning("  Failed to parse trusted root CA: %s", e)
+
+    log.info("  " + "-" * 60)
+    log.info("")
+
+
+def format_cert_info(cert_store) -> None:
+    """Format and display certificate store information."""
+    from cryptography import x509
+
+    log.info("Device Certificate Chain Details:")
+    log.info("  " + "-" * 60)
+
+    # Root CA
+    try:
+        root_ca = x509.load_der_x509_certificate(cert_store.root_cert)
+        log.info("  Root CA:")
+        log.info("    Subject:    %s", root_ca.subject.rfc4514_string())
+        log.info("    Issuer:     %s", root_ca.issuer.rfc4514_string())
+        log.info("    Serial:     %s", hex(root_ca.serial_number))
+        log.info("    Valid from: %s", root_ca.not_valid_before_utc)
+        log.info("    Valid to:   %s", root_ca.not_valid_after_utc)
+        log.info("    Size:       %d bytes", len(cert_store.root_cert))
+    except Exception as e:
+        log.warning("    Failed to parse root CA: %s", e)
+
+    # TROPIC01 CA
+    try:
+        tropic01_ca = x509.load_der_x509_certificate(cert_store.tropic01_cert)
+        log.info("  TROPIC01 CA:")
+        log.info("    Subject:    %s", tropic01_ca.subject.rfc4514_string())
+        log.info("    Issuer:     %s", tropic01_ca.issuer.rfc4514_string())
+        log.info("    Serial:     %s", hex(tropic01_ca.serial_number))
+        log.info("    Valid from: %s", tropic01_ca.not_valid_before_utc)
+        log.info("    Valid to:   %s", tropic01_ca.not_valid_after_utc)
+        log.info("    Size:       %d bytes", len(cert_store.tropic01_cert))
+    except Exception as e:
+        log.warning("    Failed to parse TROPIC01 CA: %s", e)
+
+    # XXXX CA (Intermediate)
+    try:
+        xxxx_ca = x509.load_der_x509_certificate(cert_store.intermediate_cert)
+        log.info("  XXXX CA (Intermediate):")
+        log.info("    Subject:    %s", xxxx_ca.subject.rfc4514_string())
+        log.info("    Issuer:     %s", xxxx_ca.issuer.rfc4514_string())
+        log.info("    Serial:     %s", hex(xxxx_ca.serial_number))
+        log.info("    Valid from: %s", xxxx_ca.not_valid_before_utc)
+        log.info("    Valid to:   %s", xxxx_ca.not_valid_after_utc)
+        log.info("    Size:       %d bytes", len(cert_store.intermediate_cert))
+    except Exception as e:
+        log.warning("    Failed to parse XXXX CA: %s", e)
+
+    # Device Certificate
+    try:
+        device_cert = x509.load_der_x509_certificate(cert_store.device_cert)
+        log.info("  Device Certificate:")
+        log.info("    Subject:    %s", device_cert.subject.rfc4514_string())
+        log.info("    Issuer:     %s", device_cert.issuer.rfc4514_string())
+        log.info("    Serial:     %s", hex(device_cert.serial_number))
+        log.info("    Valid from: %s", device_cert.not_valid_before_utc)
+        log.info("    Valid to:   %s", device_cert.not_valid_after_utc)
+        log.info("    Size:       %d bytes", len(cert_store.device_cert))
+    except Exception as e:
+        log.warning("    Failed to parse device certificate: %s", e)
+
+    log.info("  " + "-" * 60)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="TROPIC01 Device Certificate Verification Example",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    parser.add_argument(
+        "--port",
+        default="/dev/ttyACM0",
+        help="Serial port for USB dongle (default: /dev/ttyACM0)",
+    )
+    parser.add_argument(
+        "--root-ca",
+        type=str,
+        help="Path to custom root CA certificate file (DER format)",
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Enable debug logging",
+    )
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    log.info("=" * 60)
+    log.info("==== TROPIC01 Device Certificate Verification ====")
+    log.info("=" * 60)
+
+    # Load custom root CA if provided, otherwise use embedded
+    root_ca_bytes = None
+    root_ca_source = ""
+    if args.root_ca:
+        try:
+            with open(args.root_ca, "rb") as f:
+                root_ca_bytes = f.read()
+            root_ca_source = f"Custom file: {args.root_ca}"
+            log.info("Loaded custom root CA from: %s (%d bytes)", args.root_ca, len(root_ca_bytes))
+        except Exception as e:
+            log.error("Failed to load root CA from %s: %s", args.root_ca, e)
+            return 1
+    else:
+        # Use embedded root CA
+        from libtropic._cert.root_ca import TROPIC_SQUARE_ROOT_CA_DER
+        root_ca_bytes = TROPIC_SQUARE_ROOT_CA_DER
+        root_ca_source = "Embedded (from libtropic-upstream)"
+
+    # Display trusted root CA certificate details
+    log.info("")
+    format_trusted_root_ca(root_ca_bytes, root_ca_source)
+
+    try:
+        with Tropic01(args.port) as device:
+            log.info("Device initialized")
+            log.info("")
+
+            # Get certificate store to display certificate info
+            log.info("Reading certificate store from device...")
+            cert_store = device.get_certificate_store()
+            log.info("Certificate store retrieved")
+            log.info("")
+
+            # Display certificate information
+            format_cert_info(cert_store)
+            log.info("")
+
+            # Attempt certificate verification and session start
+            log.info("Verifying certificate chain and starting secure session...")
+            try:
+                device.verify_chip_and_start_session(
+                    private_key=SH0_PRIV_PROD,
+                    public_key=SH0_PUB_PROD,
+                    slot=PairingKeySlot.SLOT_0,
+                    root_ca=root_ca_bytes,
+                    skip_verification=False,
+                )
+
+                # Verification succeeded
+                log.info("")
+                log.info("=" * 60)
+                log.info("✓ CERTIFICATE VERIFICATION: SUCCESS")
+                log.info("=" * 60)
+                log.info("The device certificate chain is VALID.")
+                log.info("All certificates in the chain are properly signed and verified.")
+                log.info("Secure session established successfully.")
+                log.info("")
+
+                # Abort session
+                log.info("Aborting secure session...")
+                device.abort_session()
+                log.info("Session aborted")
+
+            except CertificateVerificationError as e:
+                # Verification failed
+                log.error("")
+                log.error("=" * 60)
+                log.error("✗ CERTIFICATE VERIFICATION: FAILED")
+                log.error("=" * 60)
+                log.error("The device certificate chain is INVALID.")
+                log.error("")
+                log.error("Error details:")
+                log.error("  Reason: %s", e.reason)
+                log.error("  Details: %s", e.details)
+                log.error("")
+                log.error("Possible causes:")
+                log.error("  - Device uses a different certificate chain")
+                log.error("  - Root CA mismatch (device CA != trusted CA)")
+                log.error("  - Invalid certificate signatures")
+                log.error("  - Certificate chain is incomplete or corrupted")
+                log.error("")
+                log.error("If this is a lab batch device, try:")
+                log.error("  --root-ca <path_to_test_root_ca.der>")
+                return 1
+
+            except Exception as e:
+                log.error("")
+                log.error("=" * 60)
+                log.error("✗ SESSION ESTABLISHMENT: FAILED")
+                log.error("=" * 60)
+                log.error("Failed to establish secure session: %s", e)
+                log.error("")
+                log.error("Note: Certificate verification may have passed, but")
+                log.error("      session establishment failed for another reason.")
+                if args.verbose:
+                    import traceback
+                    traceback.print_exc()
+                return 1
+
+        log.info("")
+        log.info("Device deinitialized")
+        return 0
+
+    except Exception as e:
+        log.error("Error: %s", e)
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
